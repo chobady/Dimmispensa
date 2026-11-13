@@ -80,9 +80,9 @@ const SCHEMA = {
   required: ['items'],
 };
 
-async function callOnce(key, model, parts, withSchema) {
+async function callOnce(key, model, parts, withSchema, schema = SCHEMA) {
   const generationConfig = { responseMimeType: 'application/json' };
-  if (withSchema) generationConfig.responseSchema = SCHEMA;
+  if (withSchema) generationConfig.responseSchema = schema;
   const r = await fetch(`${BASE}/models/${model}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
@@ -95,7 +95,7 @@ async function callOnce(key, model, parts, withSchema) {
   return text;
 }
 
-async function generate(key, parts) {
+async function generate(key, parts, schema = SCHEMA) {
   if (!key) throw new GeminiError('Manca la chiave Gemini: aggiungila nelle Opzioni.', 'nokey');
   const tried = new Set();
   const candidates = [savedModel(), ...DEFAULT_MODELS].filter(Boolean);
@@ -110,10 +110,10 @@ async function generate(key, parts) {
     try {
       let text;
       try {
-        text = await callOnce(key, model, parts, true);
+        text = await callOnce(key, model, parts, true, schema);
       } catch (e) {
         // alcuni modelli rifiutano lo schema: riprova chiedendo solo JSON
-        if (e.code === 'http400') text = await callOnce(key, model, parts, false);
+        if (e.code === 'http400') text = await callOnce(key, model, parts, false, schema);
         else throw e;
       }
       saveModel(model);
@@ -220,4 +220,12 @@ export function fileToJpegBase64(file, maxSide = 1600) {
     };
     img.src = url;
   });
+}
+
+// Ultima spiaggia per i codici a barre: Gemini legge le cifre stampate sotto le barre
+export async function readBarcodeDigits(key, base64, mime) {
+  const schema = { type: 'OBJECT', properties: { codice: { type: 'STRING' } }, required: ['codice'] };
+  const prompt = `Nella foto c'è il codice a barre di un prodotto alimentare. Leggi le cifre stampate sotto le barre (EAN-13, EAN-8 o UPC) e rispondi SOLO con JSON {"codice":"..."} con le sole cifre, senza spazi. Se non riesci a leggerle tutte con sicurezza, rispondi {"codice":""}.`;
+  const json = parseJSON(await generate(key, [{ text: prompt }, { inline_data: { mime_type: mime, data: base64 } }], schema));
+  return String(json.codice || '').replace(/\D/g, '');
 }

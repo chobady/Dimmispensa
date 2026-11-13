@@ -5,7 +5,8 @@ import { defaultQty, draftFromFood, makeDraft, qtyLabel } from '../lib/items.js'
 import { expiryLabel } from '../lib/dates.js';
 import QtyPicker, { unitFamily } from '../components/QtyPicker.jsx';
 import { parseLocal } from '../lib/parse.js';
-import { fileToJpegBase64, itemsFromReceipt, itemsFromText } from '../lib/gemini.js';
+import { fileToJpegBase64, itemsFromReceipt, itemsFromText, readBarcodeDigits } from '../lib/gemini.js';
+import { decodeImageFile, getDecoder, crop, validCode } from '../lib/barcode.js';
 import { lookupBarcode } from '../lib/off.js';
 import { play } from '../lib/sound.js';
 import ItemSheet from '../components/ItemSheet.jsx';
@@ -47,17 +48,7 @@ export default function Add() {
     go('dispensa');
   };
 
-  return (
-    <>
-      <div className="modes" role="tablist" aria-label="Come vuoi aggiungere">
-        {MODES.map((m) => (
-          <Btn key={m.id} role="tab" aria-selected={mode === m.id} className={mode === m.id ? 'on' : ''} icon={m.icon} iconSize={30} onClick={() => pick(m.id)}>
-            {m.name}
-          </Btn>
-        ))}
-      </div>
-
-      {drafts.length > 0 && (
+  const review = drafts.length > 0 && (
         <section style={{ marginBottom: 18 }}>
           <SectionTitle icon="1f6d2">Da mettere via ({drafts.length})</SectionTitle>
           <p className="small muted" style={{ marginBottom: 10 }}>Tocca un cibo per correggerlo. Dove leggi "circa" o "verso il", la scadenza l'ho stimata io.</p>
@@ -73,12 +64,24 @@ export default function Add() {
             <Btn block sm onClick={() => setDrafts([])}>Svuota la lista</Btn>
           </div>
         </section>
-      )}
+        );
 
+  return (
+    <>
+      <div className="modes" role="tablist" aria-label="Come vuoi aggiungere">
+        {MODES.map((m) => (
+          <Btn key={m.id} role="tab" aria-selected={mode === m.id} className={mode === m.id ? 'on' : ''} icon={m.icon} iconSize={30} onClick={() => pick(m.id)}>
+            {m.name}
+          </Btn>
+        ))}
+      </div>
+
+      {mode !== 'barcode' && review}
       {mode === 'rapido' && <Quick />}
       {mode === 'scrivi' && <Write geminiKey={geminiKey} onDrafts={addDrafts} />}
       {mode === 'scontrino' && <Receipt geminiKey={geminiKey} onDrafts={addDrafts} />}
       {mode === 'barcode' && <Barcode onDrafts={addDrafts} />}
+      {mode === 'barcode' && <div style={{ marginTop: 18 }}>{review}</div>}
 
       {editing && (
         <ItemSheet
@@ -317,19 +320,30 @@ function Receipt({ geminiKey, onDrafts }) {
 
 // ------------------------------------------------------------------ codice a barre
 function Barcode({ onDrafts }) {
-  const { toast } = useApp();
+  const { toast, state } = useApp();
+  const geminiKey = state.pantry?.geminiKey || '';
   const videoRef = useRef(null);
-  const controlsRef = useRef(null);
-  const lastRef = useRef({ code: '', t: 0 });
+  const streamRef = useRef(null);
+  const loopRef = useRef(0);
   const busyRef = useRef(false);
+  const lastRef = useRef({ code: '', t: 0 });
+  const candRef = useRef({ code: '', n: 0 });
+  const photoRef = useRef(null);
   const [on, setOn] = useState(false);
   const [status, setStatus] = useState('');
   const [manual, setManual] = useState('');
+  const [torch, setTorch] = useState(null); // null = non disponibile
+  const [unknown, setUnknown] = useState(null); // codice non trovato
+  const [unknownName, setUnknownName] = useState('');
+  const [reading, setReading] = useState(false);
 
   const stop = () => {
-    controlsRef.current?.stop();
-    controlsRef.current = null;
+    clearTimeout(loopRef.current);
+    loopRef.current = 0;
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
     setOn(false);
+    setTorch(null);
   };
   useEffect(() => stop, []);
 
@@ -338,17 +352,20 @@ function Barcode({ onDrafts }) {
     if (busyRef.current || (code === lastRef.current.code && now - lastRef.current.t < 4000)) return;
     lastRef.current = { code, t: now };
     busyRef.current = true;
-    setStatus(`Cerco ${code}...`);
+    if (navigator.vibrate) navigator.vibrate(60);
+    setStatus(`Letto ${code}, cerco il prodotto...`);
     try {
       const draft = await lookupBarcode(code);
       if (draft) {
         play('add');
         onDrafts([draft]);
+        setUnknown(null);
         setStatus(`Trovato: ${draft.name}${draft.brand ? ' (' + draft.brand + ')' : ''}. Inquadra il prossimo!`);
       } else {
         play('error');
         setStatus('');
-        toast(`Non conosco il codice ${code}. Aggiungilo con "Tocca" o "Scrivi".`, { err: true });
+        setUnknown(code);
+        setUnknownName('');
       }
     } catch (e) {
       play('error');
@@ -360,46 +377,159 @@ function Barcode({ onDrafts }) {
   };
 
   const start = async () => {
+    setUnknown(null);
     setStatus('Accendo la fotocamera...');
     setOn(true);
     try {
-      const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([import('@zxing/browser'), import('@zxing/library')]);
-      const hints = new Map([[DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E]]]);
-      const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 150 });
-      if (!videoRef.current) await new Promise((r) => requestAnimationFrame(r));
-      controlsRef.current = await reader.decodeFromConstraints({ audio: false, video: { facingMode: { ideal: 'environment' } } }, videoRef.current, (result) => {
-        if (result) handle(result.getText());
+      const decode = await getDecoder();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
       });
-      setStatus('Inquadra il codice a barre sulla riga rossa.');
+      streamRef.current = stream;
+      const track = stream.getVideoTracks()[0];
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+      // messa a fuoco continua e un po' di zoom aiutano molto con le etichette piccole
+      const adv = {};
+      if (caps.focusMode?.includes('continuous')) adv.focusMode = 'continuous';
+      if (caps.zoom && caps.zoom.max >= 1.5) adv.zoom = Math.min(caps.zoom.max, 1.5);
+      if (Object.keys(adv).length) track.applyConstraints({ advanced: [adv] }).catch(() => {});
+      if (caps.torch) setTorch(false);
+      if (!videoRef.current) await new Promise((r) => requestAnimationFrame(r));
+      const v = videoRef.current;
+      v.srcObject = stream;
+      await v.play();
+      setStatus('Inquadra il codice dentro il riquadro, a 10–15 cm.');
+      let frame = 0;
+      const tick = async () => {
+        if (!streamRef.current) return;
+        if (v.readyState >= 2 && !busyRef.current) {
+          frame++;
+          const W = v.videoWidth;
+          const H = v.videoHeight;
+          // alterno: fascia centrale (come il riquadro), fascia più alta, e codice in verticale
+          const variant = frame % 3;
+          const opts = variant === 0 ? { x: 0.08, y: 0.3, w: 0.84, h: 0.4 } : variant === 1 ? { x: 0, y: 0.15, w: 1, h: 0.7 } : { x: 0.3, y: 0.05, w: 0.4, h: 0.9, rotate: true };
+          const code = await decode(crop(v, W, H, { ...opts, maxW: 1280 }));
+          if (code) {
+            // chiedo due letture uguali di fila: niente codici sbagliati
+            const c = candRef.current;
+            if (c.code === code) c.n++;
+            else candRef.current = { code, n: 1 };
+            if (candRef.current.n >= 2) {
+              candRef.current = { code: '', n: 0 };
+              handle(code);
+            }
+          }
+        }
+        loopRef.current = setTimeout(tick, 90);
+      };
+      tick();
     } catch (e) {
-      setOn(false);
+      stop();
       setStatus('');
       toast(
         e?.name === 'NotAllowedError'
-          ? 'Fotocamera bloccata: consenti l\'accesso nelle impostazioni del browser, oppure scrivi il codice qui sotto.'
-          : 'Non riesco ad aprire la fotocamera. Scrivi il codice qui sotto.',
+          ? "Fotocamera bloccata: consenti l'accesso nelle impostazioni del browser, oppure usa \"Foto del codice\"."
+          : 'Non riesco ad aprire la fotocamera. Usa "Foto del codice" o scrivi le cifre.',
         { err: true }
       );
     }
   };
+
+  const toggleTorch = () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const next = !torch;
+    track.applyConstraints({ advanced: [{ torch: next }] }).then(() => setTorch(next)).catch(() => setTorch(null));
+  };
+
+  // Foto con la fotocamera normale del telefono: mette a fuoco meglio del video
+  const onPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    stop();
+    setUnknown(null);
+    setReading(true);
+    try {
+      let { code } = await decodeImageFile(file);
+      if (!code && geminiKey) {
+        setStatus('Le barre non si leggono bene, provo a leggere le cifre...');
+        const img = await fileToJpegBase64(file, 1600);
+        const digits = await readBarcodeDigits(geminiKey, img.base64, img.mime).catch(() => '');
+        if (validCode(digits)) code = digits;
+      }
+      if (code) {
+        await handle(code);
+      } else {
+        play('error');
+        setStatus('');
+        toast(
+          geminiKey
+            ? 'Non riesco a leggere il codice. Rifai la foto più da vicino, dritta e con più luce, oppure scrivi le cifre.'
+            : 'Non riesco a leggere il codice. Rifai la foto più da vicino e dritta, oppure scrivi le cifre. Con la chiave Gemini leggo anche le cifre stampate.',
+          { err: true }
+        );
+      }
+    } catch (err) {
+      play('error');
+      setStatus('');
+      toast(err.message || 'Foto non leggibile.', { err: true });
+    } finally {
+      setReading(false);
+    }
+  };
+
+  const addUnknown = (e) => {
+    e.preventDefault();
+    if (!unknownName.trim()) return;
+    play('add');
+    onDrafts([makeDraft({ name: unknownName.trim() })]);
+    setStatus(`Aggiunto: ${unknownName.trim()}.`);
+    setUnknown(null);
+  };
+
+  if (reading) return <Loading text={status || 'Leggo il codice...'} />;
 
   return (
     <div className="stack">
       {on ? (
         <>
           <div className="scanner">
-            <video ref={videoRef} muted playsInline />
-            <div className="aim" />
+            <video ref={videoRef} muted playsInline autoPlay />
+            <div className="frame" aria-hidden="true"><div className="aim" /></div>
           </div>
           <p className="center" role="status">{status}</p>
-          <Btn block onClick={stop}>Spegni la fotocamera</Btn>
+          <div className={torch === null ? '' : 'two'}>
+            {torch !== null && <Btn color={torch ? 'yellow' : ''} icon="1f4a1" onClick={toggleTorch}>{torch ? 'Spegni luce' : 'Luce'}</Btn>}
+            <Btn block={torch === null} onClick={stop}>Spegni la fotocamera</Btn>
+          </div>
         </>
       ) : (
         <>
           <p>Inquadra il codice a barre: nome e marca arrivano da soli. La scadenza la stimo io, la correggi dopo se serve.</p>
-          <Btn color="green" block icon="1f4f7" iconSize={30} onClick={start}>Accendi la fotocamera</Btn>
+          <Btn color="green" block icon="1f4f7" iconSize={30} onClick={start}>Inquadra con la fotocamera</Btn>
         </>
       )}
+
+      <input ref={photoRef} className="hidden" type="file" accept="image/*" capture="environment" onChange={onPhoto} />
+      <Btn block icon="1f4be" onClick={() => photoRef.current.click()}>Fai una foto al codice</Btn>
+      <p className="small muted">Se il riquadro non lo prende, la foto funziona quasi sempre meglio: il telefono mette a fuoco da solo.</p>
+
+      {unknown && (
+        <form className="win stack" onSubmit={addUnknown}>
+          <p>
+            Il codice <b>{unknown}</b> non è nell'archivio di Open Food Facts. Come si chiama il prodotto?
+          </p>
+          <input className="input" value={unknownName} onChange={(e) => setUnknownName(e.target.value)} placeholder="es. Yogurt greco Fage" autoFocus />
+          <div className="two">
+            <Btn onClick={() => setUnknown(null)}>Lascia stare</Btn>
+            <Btn type="submit" color="green" sound={null} disabled={!unknownName.trim()}>Aggiungi</Btn>
+          </div>
+        </form>
+      )}
+
       <form
         className="row"
         onSubmit={(e) => {
@@ -411,7 +541,7 @@ function Barcode({ onDrafts }) {
           }
         }}
       >
-        <input className="input grow" inputMode="numeric" placeholder="Oppure scrivi il codice" aria-label="Codice a barre" value={manual} onChange={(e) => setManual(e.target.value)} />
+        <input className="input grow" inputMode="numeric" placeholder="Oppure scrivi le cifre" aria-label="Codice a barre" value={manual} onChange={(e) => setManual(e.target.value)} />
         <Btn type="submit" icon="1f50d" disabled={manual.replace(/\D/g, '').length < 8}>Cerca</Btn>
       </form>
       {!on && status && <p className="center" role="status">{status}</p>}
