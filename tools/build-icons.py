@@ -151,9 +151,8 @@ def main():
         f.write("export const ICONS = " + json.dumps({k: data_uri(v) for k, v in icons.items()}, indent=0) + ";\n")
         f.write("export const MASCOT = " + json.dumps({k: data_uri(v) for k, v in mascot.items()}, indent=0) + ";\n")
 
-    # Icone dell'app: guscio verde acqua, "schermo" chiaro con bordo, mascotte al centro.
+    # Icone dell'app: il frigo su sfondo blu scuro.
     # Disegnata a blocchi interi per ogni misura, così i pixel restano nitidi.
-    # Lo schermo chiaro tiene l'icona leggibile anche quando iPhone la scurisce in modalità scura.
     pub = os.path.join(ROOT, "public")
     os.makedirs(pub, exist_ok=True)
     m = mascot["idle"]
@@ -181,38 +180,19 @@ def main():
 
 
 def draw_app_icon(m, size, maskable=False):
-    """Icona: sfondo verde acqua, schermo verde chiaro con cornice scura, mascotte grande."""
+    """Icona: solo il frigo, grande, su sfondo blu scuro. Disegnata a blocchi interi: pixel nitidi."""
     from PIL import ImageDraw
-    shell, shell_d, ink = hex_rgba("#227a76"), hex_rgba("#155553"), hex_rgba("#2b2140")
-    screen, screen_l = hex_rgba("#eef5d0"), hex_rgba("#dce8b0")
-    img = Image.new("RGBA", (size, size), shell)
+    img = Image.new("RGBA", (size, size), hex_rgba("#1d2b53"))
     d = ImageDraw.Draw(img)
-    if size <= 48:  # favicon: solo mascotte su schermo, niente dettagli
-        d.rectangle([0, 0, size - 1, size - 1], fill=screen)
-        b = max(1, (size - 4) // 16)
-        ox, oy = (size - 14 * b) // 2, (size - 16 * b) // 2
-    else:
-        safe = 0.80 if maskable else 1.0
-        pad = int(size * (1 - safe) / 2)
-        u = max(1, size // 64)  # unità pixel della cornice
-        # ombra in basso del guscio
-        d.rectangle([0, size - 4 * u, size, size], fill=shell_d)
-        inset = pad + int(size * 0.13 * safe)
-        x0, y0, x1, y1 = inset, inset - 2 * u, size - inset, size - inset - 2 * u
-        d.rectangle([x0 - 3 * u, y0 - 3 * u, x1 + 3 * u, y1 + 3 * u], fill=ink)  # cornice
-        d.rectangle([x0, y0, x1, y1], fill=screen)
-        for yy in range(y0, y1, 2 * u):  # righe dello schermo
-            d.rectangle([x0, yy, x1, yy + u // 2], fill=screen_l)
-        inner = (x1 - x0)
-        b = max(1, int(inner * 0.78) // 16)
-        ox, oy = x0 + (inner - 14 * b) // 2, y0 + ((y1 - y0) - 16 * b) // 2
+    fill = 0.56 if maskable else 0.74  # quanto spazio occupa il frigo in altezza
+    b = max(1, int(size * fill) // 16)
+    ox, oy = (size - 14 * b) // 2, (size - 16 * b) // 2
     for y in range(m.height):
         for x in range(m.width):
             px = m.getpixel((x, y))
             if px[3]:
                 d.rectangle([ox + x * b, oy + y * b, ox + (x + 1) * b - 1, oy + (y + 1) * b - 1], fill=px)
     return img.convert("RGB")
-
 
 if __name__ == "__main__":
     main()
