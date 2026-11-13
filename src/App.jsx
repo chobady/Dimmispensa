@@ -141,11 +141,12 @@ export default function App() {
             t.id === 'aggiungi' ? (
               <button key={t.id} type="button" className={'add ' + (tab === t.id ? 'on' : '')} aria-label="Aggiungi cibo" aria-current={tab === t.id ? 'page' : undefined} onClick={() => (play('open'), go(t.id))}>
                 <span className="a-btn">+</span>
+                <span className="add-lbl">Aggiungi cibo</span>
               </button>
             ) : (
               <button key={t.id} type="button" className={tab === t.id ? 'on' : ''} aria-current={tab === t.id ? 'page' : undefined} onClick={() => (play('tap'), go(t.id))}>
                 <span className="ico"><Icon id={t.icon} size={30} /></span>
-                {t.name}
+                <span className="nav-lbl">{t.name}</span>
                 {t.id === 'scadenze' && alerts > 0 && <b className="badge" aria-label={`${alerts} cibi da controllare`}>{alerts}</b>}
               </button>
             )

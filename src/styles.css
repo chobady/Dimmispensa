@@ -324,3 +324,86 @@ img.ghost { opacity: .3; }
 .mini { min-width: 0; }
 .card .grow { min-width: 0; }
 html, body { overflow-x: hidden; }
+
+/* ======================================================================
+   Computer: la console si apre "di lato". Menu a sinistra, contenuto largo.
+   ====================================================================== */
+.add-lbl { display: none; }
+
+@media (min-width: 900px) {
+  body { padding: 28px 24px; }
+  .app {
+    max-width: 1180px;
+    min-height: calc(100dvh - 56px);
+    display: grid;
+    grid-template-columns: 236px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    box-shadow: 0 -6px 0 var(--ink), 0 6px 0 var(--ink), -6px 0 0 var(--ink), 6px 0 0 var(--ink), 12px 12px 0 rgba(0,0,0,.35);
+  }
+  .app > .splash { grid-column: 1 / -1; max-width: 460px; margin: 0 auto; width: 100%; min-height: auto; padding: 48px 20px; }
+  .topbar { grid-column: 1 / -1; grid-row: 1; padding: 14px 22px; }
+  .topbar .logo { font-size: 15px; }
+  .topbar .where { font-size: 17px; }
+
+  .nav {
+    grid-column: 1; grid-row: 2;
+    position: sticky; top: 64px; left: auto; bottom: auto; transform: none;
+    align-self: start;
+    width: auto; max-width: none; height: auto;
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 20px 14px;
+    border-top: 0; box-shadow: none;
+    background: none;
+  }
+  .nav button {
+    flex-direction: row; justify-content: flex-start; gap: 12px;
+    color: var(--ink); opacity: 1; font-size: 18px; font-weight: 600;
+    padding: 6px 10px; margin: 0;
+  }
+  .nav button .ico { padding: 4px; }
+  .nav button.on { background: var(--yellow); box-shadow: 0 -4px 0 var(--ink), 0 4px 0 var(--ink), -4px 0 0 var(--ink), 4px 0 0 var(--ink); }
+  .nav button.on .ico { background: none; box-shadow: none; }
+  .nav .badge { position: static; margin-left: auto; font-size: 10px; padding: 5px 5px 4px 6px; }
+  .nav .add { order: -1; margin: 0 0 18px; padding: 0; gap: 12px; }
+  .nav .add .a-btn { width: 52px; height: 52px; font-size: 20px; flex: none; }
+  .nav .add .add-lbl { display: inline; font-size: 19px; font-weight: 700; }
+  .nav .add.on { background: none; box-shadow: none; }
+
+  .screen {
+    grid-column: 2; grid-row: 2;
+    padding: 24px 32px 48px 20px;
+    border-left: 4px solid var(--ink);
+    min-width: 0;
+  }
+  .talk { max-width: 720px; }
+  .talk + .btn.block { max-width: 712px; }
+
+  /* liste a due colonne */
+  .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 12px 10px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
+  .modes { max-width: 620px; }
+  .two { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+  .slots { max-width: 640px; }
+  .slots + div, .slots ~ p { max-width: 640px; }
+
+  /* Opzioni e moduli: colonna di lettura */
+  .screen > .win, .screen > .stack { max-width: 640px; }
+  .screen > .section-title { max-width: 720px; }
+
+  /* finestre di modifica al centro invece che dal basso */
+  .overlay { align-items: center; padding: 24px; }
+  .sheet { max-width: 560px; max-height: 88dvh; border: 0; padding: 18px 20px 22px;
+    box-shadow: 0 -4px 0 var(--ink), 0 4px 0 var(--ink), -4px 0 0 var(--ink), 4px 0 0 var(--ink), 0 -8px 0 var(--purple), 0 8px 0 var(--purple), -8px 0 0 var(--purple), 8px 0 0 var(--purple); }
+  .icon-grid { grid-template-columns: repeat(8, 1fr); }
+
+  .toasts { bottom: 28px; left: auto; right: 40px; transform: none; width: 400px; }
+}
+
+
+/* con il mouse: un piccolo segnale su ciò che si può cliccare */
+@media (hover: hover) and (pointer: fine) {
+  .card:hover, .tile:hover, .mini:hover { background-color: #fff6c9; }
+  .nav button:not(.on):not(.add):hover { background: rgba(107,79,187,.15); }
+  .chip:hover { background: #fff6c9; }
+  .nav .add:hover .a-btn { filter: brightness(1.08); }
+}
