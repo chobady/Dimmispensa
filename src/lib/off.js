@@ -1,15 +1,29 @@
 // Ricerca di un prodotto dal codice a barre su Open Food Facts (gratis, senza chiave).
 import { matchFood } from '../catalog.js';
 import { makeDraft } from './items.js';
+import { codeVariants } from './barcode.js';
 
-export async function lookupBarcode(code) {
-  const url = `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,product_name_it,generic_name_it,brands,quantity,product_quantity,product_quantity_unit,categories_tags`;
+const FIELDS = 'product_name,product_name_it,product_name_en,generic_name_it,generic_name,brands,quantity,product_quantity,product_quantity_unit,categories_tags';
+
+async function fetchProduct(code) {
+  const url = `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=${FIELDS}`;
   const r = await fetch(url);
-  if (!r.ok && r.status !== 404) throw new Error('Open Food Facts non risponde. Riprova.');
+  if (!r.ok && r.status !== 404) throw new Error('Open Food Facts non risponde. Riprova tra poco.');
   const data = await r.json().catch(() => ({}));
   const p = data.product;
   if (!p || data.status === 0) return null;
-  const name = (p.product_name_it || p.product_name || p.generic_name_it || '').trim();
+  return p;
+}
+
+export async function lookupBarcode(code) {
+  // provo tutte le forme del codice (i prodotti USA sono spesso salvati con uno 0 davanti)
+  let p = null;
+  for (const c of codeVariants(code)) {
+    p = await fetchProduct(c);
+    if (p) break;
+  }
+  if (!p) return null;
+  const name = (p.product_name_it || p.product_name || p.product_name_en || p.generic_name_it || p.generic_name || '').trim();
   if (!name) return null;
   const brand = String(p.brands || '').split(',')[0].trim();
   const cats = (p.categories_tags || []).map((c) => c.replace(/^[a-z]{2}:/, '').replace(/-/g, ' ')).join(' ');

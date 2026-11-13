@@ -80,13 +80,15 @@ const SCHEMA = {
   required: ['items'],
 };
 
-async function callOnce(key, model, parts, withSchema, schema = SCHEMA) {
-  const generationConfig = { responseMimeType: 'application/json' };
-  if (withSchema) generationConfig.responseSchema = schema;
+async function callOnce(key, model, parts, withSchema, schema = SCHEMA, search = false) {
+  // con la ricerca Google attiva, Gemini non accetta il formato JSON obbligato: lo chiedo nel testo
+  const generationConfig = search ? {} : { responseMimeType: 'application/json' };
+  if (withSchema && !search) generationConfig.responseSchema = schema;
+  const extra = search ? { tools: [{ google_search: {} }] } : {};
   const r = await fetch(`${BASE}/models/${model}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig }),
+    body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig, ...extra }),
   });
   if (!r.ok) throw await toError(r);
   const data = await r.json();
@@ -95,7 +97,7 @@ async function callOnce(key, model, parts, withSchema, schema = SCHEMA) {
   return text;
 }
 
-async function generate(key, parts, schema = SCHEMA) {
+async function generate(key, parts, schema = SCHEMA, search = false) {
   if (!key) throw new GeminiError('Manca la chiave Gemini: aggiungila nelle Opzioni.', 'nokey');
   const tried = new Set();
   const candidates = [savedModel(), ...DEFAULT_MODELS].filter(Boolean);
@@ -110,10 +112,10 @@ async function generate(key, parts, schema = SCHEMA) {
     try {
       let text;
       try {
-        text = await callOnce(key, model, parts, true, schema);
+        text = await callOnce(key, model, parts, true, schema, search);
       } catch (e) {
         // alcuni modelli rifiutano lo schema: riprova chiedendo solo JSON
-        if (e.code === 'http400') text = await callOnce(key, model, parts, false, schema);
+        if (e.code === 'http400' && !search) text = await callOnce(key, model, parts, false, schema);
         else throw e;
       }
       saveModel(model);
@@ -228,4 +230,17 @@ export async function readBarcodeDigits(key, base64, mime) {
   const prompt = `Nella foto c'è il codice a barre di un prodotto alimentare. Leggi le cifre stampate sotto le barre (EAN-13, EAN-8 o UPC) e rispondi SOLO con JSON {"codice":"..."} con le sole cifre, senza spazi. Se non riesci a leggerle tutte con sicurezza, rispondi {"codice":""}.`;
   const json = parseJSON(await generate(key, [{ text: prompt }, { inline_data: { mime_type: mime, data: base64 } }], schema));
   return String(json.codice || '').replace(/\D/g, '');
+}
+
+// Prodotto non presente in Open Food Facts: Gemini cerca il codice su Google
+export async function lookupBarcodeOnline(key, code) {
+  const prompt = `Cerca su internet il prodotto con codice a barre ${code} (EAN/UPC; può essere un prodotto italiano, europeo o statunitense).
+Rispondi SOLO con JSON, senza altro testo: {"trovato": true/false, "nome": "...", "marca": "...", "quantita": numero, "unita": "pz|conf|g|kg|ml|l", "tipo": "..."}
+- Metti "trovato": true SOLO se le fonti indicano proprio questo codice. Non indovinare: se non sei sicuro, "trovato": false.
+- "nome": nome breve in italiano del prodotto (traducilo se è in inglese, es. "Peanut Butter" diventa "Burro di arachidi"), senza marca e senza quantità.
+- Converti once e libbre: "quantita" in g (1 oz = 28 g, 1 lb = 454 g) o in ml (1 fl oz = 30 ml).
+- "tipo": la chiave più adatta presa ESATTAMENTE da questo elenco, oppure "altro": ${TIPI}.`;
+  const json = parseJSON(await generate(key, [{ text: prompt }], SCHEMA, true));
+  if (!json || !json.trovato || !json.nome) return null;
+  return makeDraft({ name: json.nome, brand: json.marca, qty: json.quantita, unit: json.unita, foodKey: json.tipo });
 }

@@ -5,7 +5,7 @@ import { defaultQty, draftFromFood, makeDraft, qtyLabel } from '../lib/items.js'
 import { expiryLabel } from '../lib/dates.js';
 import QtyPicker, { unitFamily } from '../components/QtyPicker.jsx';
 import { parseLocal } from '../lib/parse.js';
-import { fileToJpegBase64, itemsFromReceipt, itemsFromText, readBarcodeDigits } from '../lib/gemini.js';
+import { fileToJpegBase64, itemsFromReceipt, itemsFromText, lookupBarcodeOnline, readBarcodeDigits } from '../lib/gemini.js';
 import { decodeImageFile, getDecoder, crop, validCode } from '../lib/barcode.js';
 import { lookupBarcode } from '../lib/off.js';
 import { play } from '../lib/sound.js';
@@ -355,12 +355,19 @@ function Barcode({ onDrafts }) {
     if (navigator.vibrate) navigator.vibrate(60);
     setStatus(`Letto ${code}, cerco il prodotto...`);
     try {
-      const draft = await lookupBarcode(code);
+      let draft = await lookupBarcode(code);
+      let online = false;
+      if (!draft && geminiKey) {
+        // non è in Open Food Facts (capita spesso con i prodotti USA): Gemini lo cerca su Google
+        setStatus(`${code} non è in archivio, lo cerco su internet...`);
+        draft = await lookupBarcodeOnline(geminiKey, code).catch(() => null);
+        online = !!draft;
+      }
       if (draft) {
         play('add');
         onDrafts([draft]);
         setUnknown(null);
-        setStatus(`Trovato: ${draft.name}${draft.brand ? ' (' + draft.brand + ')' : ''}. Inquadra il prossimo!`);
+        setStatus(`Trovato${online ? ' su internet' : ''}: ${draft.name}${draft.brand ? ' (' + draft.brand + ')' : ''}.${online ? ' Controlla che sia giusto.' : ''} Inquadra il prossimo!`);
       } else {
         play('error');
         setStatus('');
@@ -520,7 +527,7 @@ function Barcode({ onDrafts }) {
       {unknown && (
         <form className="win stack" onSubmit={addUnknown}>
           <p>
-            Il codice <b>{unknown}</b> non è nell'archivio di Open Food Facts. Come si chiama il prodotto?
+            Il codice <b>{unknown}</b> non è nell'archivio di Open Food Facts{geminiKey ? ' e non l\'ho trovato neanche su internet' : ''}. Come si chiama il prodotto?
           </p>
           <input className="input" value={unknownName} onChange={(e) => setUnknownName(e.target.value)} placeholder="es. Yogurt greco Fage" autoFocus />
           <div className="two">
