@@ -7,6 +7,13 @@ export const cloudEnabled = !!(firebaseConfig && firebaseConfig.apiKey && fireba
 
 const LS_ITEMS = 'dm_items';
 const LS_KEY = 'dm_gemini_key';
+const LS_MEALS = 'dm_meals';
+const KEEP_DAYS = 60; // il calendario tiene gli ultimi 60 giorni
+
+const oldMealDays = (meals) => {
+  const cut = new Date(Date.now() - KEEP_DAYS * 86400000).toISOString().slice(0, 10);
+  return Object.keys(meals || {}).filter((d) => d < cut);
+};
 
 let state = {
   mode: cloudEnabled ? 'cloud' : 'local',
@@ -14,6 +21,7 @@ let state = {
   user: null, // { uid, email, name }
   pantry: null, // { id, name, members, memberNames, geminiKey }
   items: [],
+  meals: {}, // { 'AAAA-MM-GG': { colazione: [...], snack: [...], pranzo: [...], cena: [...] } }
   online: true,
   error: null,
 };
@@ -48,9 +56,12 @@ export const localItemsCount = () => lsGet(LS_ITEMS, []).length;
 // ---------------------------------------------------------------- locale
 const local = {
   start() {
-    set({ phase: 'ready', pantry: { id: 'local', name: 'La mia dispensa', local: true, geminiKey: lsGet(LS_KEY, '') }, items: lsGet(LS_ITEMS, []) });
+    const meals = lsGet(LS_MEALS, {});
+    oldMealDays(meals).forEach((d) => delete meals[d]);
+    set({ phase: 'ready', pantry: { id: 'local', name: 'La mia dispensa', local: true, geminiKey: lsGet(LS_KEY, '') }, items: lsGet(LS_ITEMS, []), meals });
     window.addEventListener('storage', (e) => {
       if (e.key === LS_ITEMS) set({ items: lsGet(LS_ITEMS, []) });
+      if (e.key === LS_MEALS) set({ meals: lsGet(LS_MEALS, {}) });
     });
   },
   save(items) {
@@ -66,6 +77,13 @@ const local = {
   },
   async removeItem(id) {
     local.save(state.items.filter((it) => it.id !== id));
+  },
+  async setMealSlot(date, slot, list) {
+    const meals = { ...state.meals, [date]: { ...(state.meals[date] || {}), [slot]: list } };
+    if (!list.length) delete meals[date][slot];
+    if (!Object.keys(meals[date]).length) delete meals[date];
+    lsSet(LS_MEALS, meals);
+    set({ meals });
   },
   async setGeminiKey(key) {
     lsSet(LS_KEY, key);
@@ -165,7 +183,15 @@ const cloud = {
       F.doc(db, 'pantries', pid),
       (snap) => {
         if (!snap.exists()) return;
-        set({ pantry: { id: pid, ...snap.data() }, phase: 'ready' });
+        const data = snap.data();
+        set({ pantry: { id: pid, ...data }, meals: data.meals || {}, phase: 'ready' });
+        // pulizia: i giorni più vecchi di 2 mesi vengono tolti (una volta per sessione)
+        const old = oldMealDays(data.meals);
+        if (old.length && !cloud.pruned) {
+          cloud.pruned = true;
+          const args = old.flatMap((d) => [new F.FieldPath('meals', d), F.deleteField()]);
+          F.updateDoc(F.doc(db, 'pantries', pid), ...args).catch((e) => console.error(e));
+        }
       },
       (e) => {
         // non sono più tra i membri (o regole non pubblicate): torno alla scelta della dispensa
@@ -271,6 +297,16 @@ const cloud = {
   async removeItem(id) {
     fb.F.deleteDoc(cloud.itemRef(id)).catch(reportWriteError);
   },
+  async setMealSlot(date, slot, list) {
+    const { db, F } = fb;
+    const ref = F.doc(db, 'pantries', state.pantry.id);
+    const value = list.length ? list : F.deleteField();
+    // aggiorno subito lo schermo, Firestore conferma dopo
+    const meals = { ...state.meals, [date]: { ...(state.meals[date] || {}), [slot]: list } };
+    if (!list.length) delete meals[date][slot];
+    set({ meals });
+    F.updateDoc(ref, new F.FieldPath('meals', date, slot), value).catch(reportWriteError);
+  },
   async setGeminiKey(key) {
     await fb.F.updateDoc(fb.F.doc(fb.db, 'pantries', state.pantry.id), { geminiKey: key });
   },
@@ -289,6 +325,7 @@ export const actions = {
   updateItem: (id, patch) => impl.updateItem(id, patch),
   removeItem: (id) => impl.removeItem(id),
   setGeminiKey: (key) => impl.setGeminiKey(key),
+  setMealSlot: (date, slot, list) => impl.setMealSlot(date, slot, list),
   clearError: () => set({ error: null }),
   // solo cloud
   signUp: cloud.signUp,

@@ -9,7 +9,7 @@ Il frigo e la dispensa sempre in tasca, in stile Game Boy Color.
   - *Scrivi*: scrivi o detta "2 latte, pasta Barilla 500 g, yogurt scade il 20" (con Gemini capisce di più);
   - *Scontrino*: foto dello scontrino, Gemini estrae i prodotti;
   - *Barcode*: inquadri il codice a barre, nome e marca arrivano da Open Food Facts.
-- **Cena**: ti dice cosa hai in casa, partendo da quello che scade prima. Niente ricette. Se sei indeciso, tira il dado.
+- **Pasti**: calendario settimanale con colazione, snack, pranzo e cena. Ci metti il cibo che hai (o un piatto scritto a mano), ti avvisa se qualcosa scade prima del giorno scelto o non è in nessun pasto, e quando segni "mangiato" lo toglie dalla dispensa. "Sorprendimi" riempie un pasto per te.
 - **Sincronizzazione**: login Firebase e dispensa condivisa con un codice.
 
 ## Per farla funzionare

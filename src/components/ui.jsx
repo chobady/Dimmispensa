@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ICONS, MASCOT } from '../icons-data.js';
 import { expiryLabel, expiryStatus, lifeRatio } from '../lib/dates.js';
 import { qtyLabel } from '../lib/items.js';
@@ -127,7 +128,8 @@ export function Sheet({ title, onClose, children }) {
       document.body.style.overflow = prev;
     };
   }, []);
-  return (
+  // portal: la finestra va sopra a tutto, anche alla barra in basso
+  return createPortal(
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}>
         <div className="sheet-head">
@@ -138,7 +140,8 @@ export function Sheet({ title, onClose, children }) {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

@@ -407,3 +407,74 @@ html, body { overflow-x: hidden; }
   .chip:hover { background: #fff6c9; }
   .nav .add:hover .a-btn { filter: brightness(1.08); }
 }
+
+/* ---------- calendario pasti ---------- */
+.cal-head { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+.cal-month { flex: 1; text-align: center; }
+.cal-month::first-letter { text-transform: uppercase; }
+.board-title .short { display: none; }
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-bottom: 16px; }
+.day {
+  border: 0; background: var(--white); margin: var(--px); padding: 6px 0 6px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0;
+  box-shadow: 0 -4px 0 var(--ink), 0 4px 0 var(--ink), -4px 0 0 var(--ink), 4px 0 0 var(--ink), inset -3px -3px 0 rgba(43,33,64,.13);
+}
+.day .wd { font-size: 14px; font-weight: 600; }
+.day .dn { font-family: var(--font-title); font-size: 13px; }
+.day .pips { display: flex; gap: 2px; }
+.day .pips i { width: 5px; height: 5px; background: var(--paper-2); box-shadow: 0 0 0 1px var(--ink-soft); }
+.day .pips i.full { background: var(--green); }
+.day.past { background: #e7ead8; color: var(--ink-soft); }
+.day.today .dn { color: var(--red-d); }
+.day.today { box-shadow: 0 -4px 0 var(--red), 0 4px 0 var(--red), -4px 0 0 var(--red), 4px 0 0 var(--red); }
+.day.on { background: var(--yellow); box-shadow: 0 -4px 0 var(--ink), 0 4px 0 var(--ink), -4px 0 0 var(--ink), 4px 0 0 var(--ink), inset 3px 3px 0 var(--yellow-d); transform: translateY(2px); color: var(--ink); }
+
+.week-board .board-day { display: none; }
+.week-board .board-day.sel { display: flex; flex-direction: column; gap: 12px; animation: pop .25s steps(4); }
+.board-title { font-family: var(--font-title); font-size: 11px; line-height: 1.5; background: var(--ink); color: var(--paper); padding: 6px 8px 4px; align-self: flex-start; }
+.board-day.today .board-title { background: var(--red-d); }
+.meal { padding: 8px 10px 10px; }
+.meal-head { display: flex; align-items: center; gap: 8px; }
+.meal-name { font-weight: 700; font-size: 18px; flex: 1; }
+.meal-add {
+  border: 0; width: 34px; height: 34px; background: #7bd66a; font-family: var(--font-title); font-size: 14px; padding: 2px 0 0 2px;
+  box-shadow: 0 0 0 3px var(--ink), inset -3px -3px 0 rgba(43,33,64,.22);
+}
+.meal-add:active { transform: translateY(2px); }
+.meal-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.entry {
+  border: 0; display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 5px; max-width: 100%;
+  background: var(--paper); box-shadow: 0 0 0 2px var(--ink); margin: 2px; font-weight: 600; font-size: 16px; text-align: left;
+}
+.entry .en { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry.done { background: #d8f5c8; }
+.entry.done .en { text-decoration: line-through; text-decoration-thickness: 2px; color: var(--ink-soft); }
+.entry.late { background: #ffd9d4; }
+.entry .flag { font-size: 12px; color: var(--red-d); white-space: nowrap; }
+.entry .flag.muted { color: var(--ink-soft); }
+.late-txt { color: var(--red-d); }
+.mini.taken { opacity: .55; }
+.mini .plus-sign { font-family: var(--font-title); font-size: 14px; color: var(--green-d); flex: none; }
+.chip-x { display: inline-flex; align-items: center; gap: 4px; }
+
+@media (min-width: 900px) {
+  /* sul computer si vede tutta la settimana: i giorni diventano colonne */
+  .week { display: none; }
+  .cal-head { max-width: 420px; }
+  .week-board { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+  .week-board .board-day { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .week-board .board-day.sel { animation: none; }
+  .board-title { font-size: 10px; align-self: stretch; text-align: center; padding: 7px 2px 5px; }
+  .board-title .long { display: none; }
+  .board-title .short { display: inline; }
+  .meal { padding: 6px 6px 8px; margin: 3px; }
+  .meal-head { gap: 4px; }
+  .meal-head img { display: none; }
+  .meal-name { font-size: 14px; }
+  .meal-add { width: 24px; height: 24px; font-size: 10px; box-shadow: 0 0 0 2px var(--ink); }
+  .meal-list { flex-direction: column; flex-wrap: nowrap; gap: 4px; margin-top: 6px; }
+  .entry { font-size: 13px; padding: 3px 5px 3px 3px; gap: 4px; }
+  .entry img { width: 16px; height: 16px; }
+  .entry .flag { display: none; }
+  .board-day.past { opacity: .7; }
+}
