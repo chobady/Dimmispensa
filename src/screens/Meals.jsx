@@ -121,7 +121,9 @@ export default function Meals() {
   let mood = 'idle';
   if (urgentUnplanned.length) {
     const names = urgentUnplanned.slice(0, 2).map((i) => i.name.toLowerCase()).join(' e ');
-    text = `Occhio: ${names}${urgentUnplanned.length > 2 ? ` e altri ${urgentUnplanned.length - 2}` : ''} ${urgentUnplanned.length === 1 ? 'scade' : 'scadono'} presto e non ${urgentUnplanned.length === 1 ? 'è' : 'sono'} in nessun pasto.`;
+    const more = urgentUnplanned.length - 2;
+    const list = urgentUnplanned.length === 2 ? names : more > 0 ? `${urgentUnplanned.slice(0, 2).map((i) => i.name.toLowerCase()).join(', ')} ${more === 1 ? 'e un altro cibo' : `e altri ${more} cibi`}` : names;
+    text = `Occhio: ${list} ${urgentUnplanned.length === 1 ? 'scade' : 'scadono'} presto e non ${urgentUnplanned.length === 1 ? 'è' : 'sono'} in nessun pasto.`;
     mood = 'worry';
   } else if (nextSlot) {
     const c = todayMeals.cena?.length ? `Stasera: ${todayMeals.cena.map((e) => e.name.toLowerCase()).join(', ')}.` : 'Oggi hai già qualcosa in programma.';
@@ -364,7 +366,7 @@ function Picker({ date, slot, entries, plannedIds, onClose, onRemove }) {
         <input className="input grow" type="search" placeholder="Cerca in dispensa o scrivi un piatto" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cerca o scrivi" />
       </form>
       <div className="two" style={{ marginTop: 8 }}>
-        <Btn color="purple" icon="1f3b2" sound={null} onClick={surprise}>Sorprendimi</Btn>
+        <Btn color="shell" icon="1f3b2" sound={null} onClick={surprise}>Sorprendimi</Btn>
         <Btn color="green" icon="2705" onClick={onClose}>Fatto</Btn>
       </div>
       {q.trim() && (
