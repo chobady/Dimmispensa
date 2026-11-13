@@ -478,3 +478,12 @@ html, body { overflow-x: hidden; }
   .entry .flag { display: none; }
   .board-day.past { opacity: .7; }
 }
+.chip.big { font-size: 17px; padding: 8px 12px 9px; }
+.stepper .unit-lbl { font-weight: 700; margin-left: 6px; }
+.qty-head { display: flex; align-items: center; gap: 12px; }
+.qty-head .nm { font-weight: 700; font-size: 21px; }
+.entry .pq { font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
+@media (min-width: 900px) {
+  .hscroll { flex-wrap: wrap; overflow: visible; margin: 0; padding: 4px 0 8px; }
+  .entry .pq { font-size: 11px; }
+}

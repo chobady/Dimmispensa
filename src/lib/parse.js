@@ -64,7 +64,7 @@ function parseChunk(chunk) {
   let expiry;
   [s, expiry] = takeExpiry(s);
 
-  let qty = 1;
+  let qty;
   let unit;
   let m = s.match(/(\d+(?:[.,]\d+)?)\s*(kg|chili|chilo|grammi|gr|g|litri|litro|lt|l|ml|pz|pezzi|pezzo|confezioni|confezione|conf|pacchi|pacco|scatole|scatola|bottiglie|bottiglia|vasetti|vasetto)\b/);
   if (m) {

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CATALOG, CATEGORIES, norm } from '../catalog.js';
+import { CATALOG, CATEGORIES, LOCATIONS, PRESETS, norm } from '../catalog.js';
 import { actions } from '../lib/store.js';
-import { draftFromFood, makeDraft } from '../lib/items.js';
+import { defaultQty, draftFromFood, makeDraft, qtyLabel } from '../lib/items.js';
+import { expiryLabel } from '../lib/dates.js';
+import QtyPicker, { unitFamily } from '../components/QtyPicker.jsx';
 import { parseLocal } from '../lib/parse.js';
 import { fileToJpegBase64, itemsFromReceipt, itemsFromText } from '../lib/gemini.js';
 import { lookupBarcode } from '../lib/off.js';
 import { play } from '../lib/sound.js';
 import ItemSheet from '../components/ItemSheet.jsx';
-import { Btn, Icon, ItemCard, Loading, SectionTitle, Talk, useApp } from '../components/ui.jsx';
+import { Btn, Icon, ItemCard, Loading, SectionTitle, Sheet, Talk, useApp } from '../components/ui.jsx';
 
 const MODES = [
   { id: 'rapido', name: 'Tocca', icon: '1f44d' },
@@ -104,19 +106,24 @@ function Quick() {
   const [q, setQ] = useState('');
   const [counts, setCounts] = useState({});
   const [jump, setJump] = useState(null);
+  const [ask, setAsk] = useState(null); // bozza in attesa di quantità
 
   const foods = useMemo(() => {
     const nq = norm(q);
     return CATALOG.filter((f) => (nq ? f.kws.some((k) => k.includes(nq)) : cat === 'tutti' || f.cat === cat));
   }, [cat, q]);
 
-  const add = (food, nameOverride) => {
-    const draft = nameOverride ? makeDraft({ name: nameOverride }) : draftFromFood(food);
+  const open = (food, nameOverride) => {
+    play('open');
+    setAsk({ food, draft: nameOverride ? makeDraft({ name: nameOverride }) : draftFromFood(food) });
+  };
+  const add = (food, draft) => {
+    setAsk(null);
     actions.addItems([draft]);
     play('add');
     setCounts((c) => ({ ...c, [food?.key || '_']: (c[food?.key || '_'] || 0) + 1 }));
     setJump({ key: food?.key, t: Date.now() });
-    toast(`${draft.name}: aggiunto in ${draft.loc}`, { key: 'quick', action: { label: 'Modifica', fn: () => openItemById(draft.id) } });
+    toast(`${draft.name} (${qtyLabel(draft)}): aggiunto in ${draft.loc}`, { key: 'quick', action: { label: 'Modifica', fn: () => openItemById(draft.id) } });
   };
 
   return (
@@ -130,10 +137,10 @@ function Quick() {
           ))}
         </div>
       )}
-      <p className="small muted" style={{ margin: '6px 0 10px' }}>Un tocco e il cibo è già in casa, con posto e scadenza stimati.</p>
+      <p className="small muted" style={{ margin: '6px 0 10px' }}>Tocca un cibo, scegli quanto e il gioco è fatto. Posto e scadenza li stimo io.</p>
       <div className="grid">
         {foods.map((f) => (
-          <button key={f.key} type="button" className={'tile ' + (jump?.key === f.key ? 'jump' : '')} onClick={() => add(f)} onAnimationEnd={() => setJump(null)}>
+          <button key={f.key} type="button" className={'tile ' + (jump?.key === f.key ? 'jump' : '')} onClick={() => open(f)} onAnimationEnd={() => setJump(null)}>
             <Icon id={f.icon} size={40} />
             <span>{f.name}</span>
             {counts[f.key] > 0 && <b className="count">{counts[f.key]}</b>}
@@ -141,9 +148,10 @@ function Quick() {
           </button>
         ))}
       </div>
+      {ask && <QtySheet ask={ask} onClose={() => setAsk(null)} onAdd={(d) => add(ask.food, d)} />}
       {q && (
         <div style={{ marginTop: 14 }}>
-          <Btn block icon="2795" sound={null} onClick={() => add(null, q.trim())}>Aggiungi "{q.trim()}" così com'è</Btn>
+          <Btn block icon="2795" sound={null} onClick={() => open(null, q.trim())}>Aggiungi "{q.trim()}" così com'è</Btn>
         </div>
       )}
     </>
@@ -408,5 +416,41 @@ function Barcode({ onDrafts }) {
       </form>
       {!on && status && <p className="center" role="status">{status}</p>}
     </div>
+  );
+}
+
+// ------------------------------------------------------------------ quanto ne hai comprato?
+function QtySheet({ ask, onClose, onAdd }) {
+  const [d, setD] = useState(ask.draft);
+  const qtyNum = Number(String(d.qty).replace(',', '.')) || 0;
+  const change = ({ qty, unit, unitChanged }) => setD((v) => ({ ...v, unit, qty: unitChanged ? defaultQty(unit) : qty }));
+  const setLoc = (loc) => {
+    // cambiando posto ricalcolo la scadenza stimata (in freezer dura di più)
+    const fresh = makeDraft({ name: d.name, foodKey: d.food, loc, qty: d.qty, unit: d.unit });
+    setD((v) => ({ ...v, loc, expiry: v.est ? fresh.expiry : v.expiry }));
+  };
+  return (
+    <Sheet title="Quanto ne hai?" onClose={onClose}>
+      <form className="stack" onSubmit={(e) => (e.preventDefault(), qtyNum > 0 && onAdd({ ...d, qty: qtyNum }))}>
+        <div className="qty-head">
+          <Icon id={d.icon} size={50} />
+          <div>
+            <p className="nm">{d.name}</p>
+            <p className="small muted">{d.expiry ? `${expiryLabel(d.expiry, d.est)}${d.est ? ' (stimata)' : ''}` : 'non scade'}</p>
+          </div>
+        </div>
+        <QtyPicker qty={d.qty} unit={d.unit} units={unitFamily(d.unit)} presets={PRESETS[d.unit] || PRESETS.pz} onChange={change} />
+        <div className="seg">
+          {LOCATIONS.map((l) => (
+            <button key={l.id} type="button" className={d.loc === l.id ? 'on' : ''} aria-pressed={d.loc === l.id} onClick={() => setLoc(l.id)}>
+              <Icon id={l.icon} size={20} /> {l.name}
+            </button>
+          ))}
+        </div>
+        <Btn type="submit" color="green" block icon="2795" sound={null} disabled={!(qtyNum > 0)}>
+          Aggiungi {qtyNum > 0 ? qtyLabel({ qty: qtyNum, unit: d.unit }) : ''}
+        </Btn>
+      </form>
+    </Sheet>
   );
 }

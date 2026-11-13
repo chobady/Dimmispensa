@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { norm, roleOf } from '../catalog.js';
+import { norm, roleOf, PORTIONS } from '../catalog.js';
 import { actions } from '../lib/store.js';
 import { addDays, daysLeft, expiryLabel, expiryStatus, fromISO, todayISO, toISO } from '../lib/dates.js';
-import { newId, qtyLabel } from '../lib/items.js';
+import { defaultPortion, newId, portionLabel, qtyLabel } from '../lib/items.js';
+import QtyPicker from '../components/QtyPicker.jsx';
 import { play } from '../lib/sound.js';
 import { Btn, Icon, Sheet, Talk, useApp } from '../components/ui.jsx';
 import { byExpiry } from './Pantry.jsx';
@@ -61,7 +62,22 @@ function weightedPick(list, warnDays, exclude = new Set()) {
   return pool[pool.length - 1];
 }
 
-const entryFrom = (item) => ({ id: newId(), item: item.id, name: item.name, icon: item.icon });
+// portion: { qty, unit, all }
+const entryFrom = (item, portion) => {
+  const p = portion || { qty: defaultPortion(item, roleOf(item)), unit: item.unit };
+  const all = p.all || Number(p.qty) >= Number(item.qty);
+  return { id: newId(), item: item.id, name: item.name, icon: item.icon, unit: item.unit, qty: all ? Number(item.qty) : Number(p.qty), all };
+};
+
+// Quanto ne resta in dispensa togliendo le porzioni già programmate (dal giorno indicato in poi)
+const reservedFor = (meals, itemId, fromDate, skipEntryId) => {
+  let r = 0;
+  for (const [d, slots] of Object.entries(meals)) {
+    if (d < fromDate) continue;
+    for (const list of Object.values(slots || {})) for (const e of list || []) if (e.item === itemId && !e.done && e.id !== skipEntryId) r += e.all ? Infinity : Number(e.qty) || 0;
+  }
+  return r;
+};
 
 export default function Meals() {
   const { state, warnDays } = useApp();
@@ -222,6 +238,7 @@ function MealSlot({ date, slot, entries, itemsById, onAdd, onEntry }) {
               <button key={e.id} type="button" className={'entry ' + (e.done ? 'done' : '') + (late ? ' late' : '')} onClick={() => onEntry(e)}>
                 <Icon id={e.icon} size={20} />
                 <span className="en">{e.name}</span>
+                {e.item && <span className="pq">{portionLabel(e)}</span>}
                 {e.done && <Icon id="2705" size={14} />}
                 {late && <span className="flag">scade prima</span>}
                 {gone && <span className="flag muted">finito</span>}
@@ -237,6 +254,7 @@ function MealSlot({ date, slot, entries, itemsById, onAdd, onEntry }) {
 function Picker({ date, slot, entries, plannedIds, onClose, onRemove }) {
   const { state, warnDays, toast } = useApp();
   const [q, setQ] = useState('');
+  const [portionFor, setPortionFor] = useState(null);
   const slotInfo = SLOTS.find((s) => s.id === slot);
   const inSlot = new Set(entries.map((e) => e.item).filter(Boolean));
   const edible = state.items.filter((i) => expiryStatus(i.expiry, warnDays) !== 'expired' && roleOf(i) !== 'cond').sort(byExpiry);
@@ -252,7 +270,8 @@ function Picker({ date, slot, entries, plannedIds, onClose, onRemove }) {
   };
   const addItem = (item) => {
     if (inSlot.has(item.id)) return;
-    add([entryFrom(item)]);
+    play('open');
+    setPortionFor(item);
   };
   const addFree = () => {
     const name = q.trim();
@@ -282,7 +301,7 @@ function Picker({ date, slot, entries, plannedIds, onClose, onRemove }) {
       return;
     }
     play('roll');
-    add(picks.map(entryFrom));
+    add(picks.map((i) => entryFrom(i)));
   };
 
   const Row = ({ item }) => {
@@ -315,13 +334,28 @@ function Picker({ date, slot, entries, plannedIds, onClose, onRemove }) {
       </>
     ) : null;
 
+  if (portionFor) {
+    return (
+      <PortionSheet
+        item={portionFor}
+        title={`${slotInfo.name} · ${dayTitle(date)}`}
+        reserved={reservedFor(state.meals || {}, portionFor.id, todayISO())}
+        onBack={() => setPortionFor(null)}
+        onAdd={(portion) => {
+          add([entryFrom(portionFor, portion)]);
+          setPortionFor(null);
+        }}
+      />
+    );
+  }
+
   return (
     <Sheet title={`${slotInfo.name} · ${dayTitle(date)}`} onClose={onClose}>
       {entries.length > 0 && (
         <div className="chips" style={{ marginBottom: 12 }}>
           {entries.map((e) => (
             <button key={e.id} type="button" className="chip on chip-x" onClick={() => onRemove(e.id)} aria-label={`Togli ${e.name}`}>
-              <Icon id={e.icon} size={16} className="inline" /> {e.name} ✕
+              <Icon id={e.icon} size={16} className="inline" /> {e.name}{e.item ? ' · ' + portionLabel(e) : ''} ✕
             </button>
           ))}
         </div>
@@ -344,40 +378,104 @@ function Picker({ date, slot, entries, plannedIds, onClose, onRemove }) {
   );
 }
 
+function PortionSheet({ item, title, reserved, onBack, onAdd, initial }) {
+  const total = Number(item.qty) || 0;
+  const free = Math.max(0, total - (reserved === Infinity ? total : reserved));
+  const [p, setP] = useState(initial || { qty: defaultPortion(item, roleOf(item)), unit: item.unit, all: false });
+  const n = Number(String(p.qty).replace(',', '.')) || 0;
+  const presets = (PORTIONS[item.unit] || PORTIONS.pz).filter((v) => v < total);
+  const ok = p.all || n > 0;
+  return (
+    <Sheet title={title} onClose={onBack}>
+      <form className="stack" onSubmit={(e) => (e.preventDefault(), ok && onAdd({ ...p, qty: p.all ? total : n }))}>
+        <div className="qty-head">
+          <Icon id={item.icon} size={50} />
+          <div>
+            <p className="nm">{item.name}</p>
+            <p className="small muted">
+              In dispensa: {qtyLabel(item)}
+              {reserved > 0 && reserved !== Infinity ? ` · libero: ${qtyLabel({ qty: Math.round(free * 1000) / 1000, unit: item.unit })}` : ''}
+              {reserved === Infinity ? ' · già messo tutto in un altro pasto' : ''}
+            </p>
+          </div>
+        </div>
+        <h3 className="label">Quanto ne usi per questo pasto?</h3>
+        <QtyPicker
+          qty={p.qty}
+          unit={item.unit}
+          presets={presets}
+          all={p.all}
+          allLabel={`Tutto (${qtyLabel(item)})`}
+          onAll={() => setP({ ...p, all: true })}
+          onChange={({ qty }) => setP({ qty, unit: item.unit, all: false })}
+        />
+        {!p.all && n > free && free < total && <p className="small late-txt">Attenzione: con gli altri pasti già programmati non ne hai abbastanza.</p>}
+        {!p.all && n > total && <p className="small late-txt">In dispensa ne hai solo {qtyLabel(item)}.</p>}
+        <div className="two">
+          <Btn onClick={onBack}>Indietro</Btn>
+          <Btn type="submit" color="green" icon="2795" sound={null} disabled={!ok}>Aggiungi</Btn>
+        </div>
+      </form>
+    </Sheet>
+  );
+}
+
 function EntrySheet({ date, slot, entry, item, onClose, onRemove }) {
   const { state, toast } = useApp();
+  const [editing, setEditing] = useState(false);
   const slotInfo = SLOTS.find((s) => s.id === slot);
   const list = state.meals[date]?.[slot] || [];
-  const setDone = (done) => actions.setMealSlot(date, slot, list.map((e) => (e.id === entry.id ? { ...e, done } : e)));
-  const countable = item && (item.unit === 'pz' || item.unit === 'conf') && Number(item.qty) > 1;
+  const patchEntry = (patch) => actions.setMealSlot(date, slot, list.map((e) => (e.id === entry.id ? { ...e, ...patch } : e)));
+  const setDone = (done) => patchEntry({ done });
+  // porzione: vecchie voci senza quantità valgono "tutto"
+  const portion = entry.qty ? Number(entry.qty) : null;
+  const usesAll = item && (entry.all || !portion || portion >= Number(item.qty));
 
-  const eat = (mode) => {
+  const eat = () => {
     play('eat');
     setDone(true);
     onClose();
-    if (!item || mode === 'keep') {
+    if (!item) {
       toast(`${entry.name}: mangiato!`, { action: { label: 'Annulla', fn: () => setDone(false) } });
       return;
     }
     const snapshot = { ...item };
-    if (mode === 'one') {
-      actions.updateItem(item.id, { qty: Number(item.qty) - 1 });
-      toast(`${entry.name}: mangiato, ne restano ${Number(item.qty) - 1}.`, {
-        action: { label: 'Annulla', fn: () => (actions.updateItem(item.id, { qty: snapshot.qty }), setDone(false)) },
-      });
-    } else {
+    if (usesAll) {
       actions.removeItem(item.id);
       toast(`${entry.name}: mangiato e finito.`, { action: { label: 'Annulla', fn: () => (actions.addItems([snapshot]), setDone(false)) } });
+    } else {
+      const left = Math.round((Number(item.qty) - portion) * 1000) / 1000;
+      actions.updateItem(item.id, { qty: left });
+      toast(`${entry.name}: mangiato, ne restano ${qtyLabel({ qty: left, unit: item.unit })}.`, {
+        action: { label: 'Annulla', fn: () => (actions.updateItem(item.id, { qty: snapshot.qty }), setDone(false)) },
+      });
     }
   };
+
+  if (editing && item) {
+    return (
+      <PortionSheet
+        item={item}
+        title={`${slotInfo.name} · ${dayTitle(date)}`}
+        reserved={reservedFor(state.meals || {}, item.id, todayISO(), entry.id)}
+        initial={{ qty: portion || defaultPortion(item, roleOf(item)), unit: item.unit, all: !!entry.all }}
+        onBack={() => setEditing(false)}
+        onAdd={(p) => {
+          const all = p.all || Number(p.qty) >= Number(item.qty);
+          patchEntry({ qty: all ? Number(item.qty) : Number(p.qty), unit: item.unit, all });
+          setEditing(false);
+        }}
+      />
+    );
+  }
 
   return (
     <Sheet title={`${slotInfo.name} · ${dayTitle(date)}`} onClose={onClose}>
       <div className="stack">
-        <div className="row">
+        <div className="qty-head">
           <Icon id={entry.icon} size={50} />
           <div className="grow">
-            <p style={{ fontWeight: 700, fontSize: 20 }}>{entry.name}</p>
+            <p className="nm">{entry.name}{entry.item && (entry.qty || entry.all) ? ` · ${portionLabel(entry)}` : ''}</p>
             <p className="small muted">
               {item ? `In dispensa: ${qtyLabel(item)} · ${expiryLabel(item.expiry, item.est)}` : entry.item ? 'Non è più in dispensa.' : 'Piatto scritto a mano, non dalla dispensa.'}
             </p>
@@ -388,14 +486,13 @@ function EntrySheet({ date, slot, entry, item, onClose, onRemove }) {
             <p className="win flat small" style={{ background: '#d8f5c8' }}>Segnato come mangiato.</p>
             <Btn block onClick={() => (setDone(false), onClose())}>Non l'ho ancora mangiato</Btn>
           </>
-        ) : item ? (
-          <>
-            {countable && <Btn color="yellow" block icon="1f60b" sound={null} onClick={() => eat('one')}>Mangiato: togli 1 dalla dispensa</Btn>}
-            <Btn color="yellow" block icon="1f60b" sound={null} onClick={() => eat('all')}>Mangiato: è finito</Btn>
-            <Btn block icon="1f60b" sound={null} onClick={() => eat('keep')}>Mangiato, ma ne resta ancora</Btn>
-          </>
         ) : (
-          <Btn color="yellow" block icon="1f60b" sound={null} onClick={() => eat('keep')}>Mangiato</Btn>
+          <>
+            <Btn color="yellow" block icon="1f60b" sound={null} onClick={eat}>
+              {item ? (usesAll ? 'Mangiato: lo tolgo dalla dispensa' : `Mangiato: tolgo ${portionLabel({ qty: portion, unit: item.unit })} dalla dispensa`) : 'Mangiato'}
+            </Btn>
+            {item && <Btn block icon="270f" onClick={() => setEditing(true)}>Cambia la quantità</Btn>}
+          </>
         )}
         <Btn color="red" block icon="274c" onClick={onRemove}>Togli da questo pasto</Btn>
       </div>

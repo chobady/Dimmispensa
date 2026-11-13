@@ -6,15 +6,15 @@ export const newId = () => Date.now().toString(36) + Math.random().toString(36).
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 // Crea una "bozza" di cibo completa partendo da pochi dati (anche solo il nome).
-export function makeDraft({ name, brand = '', qty = 1, unit, foodKey, loc, expiry, est }) {
+export function makeDraft({ name, brand = '', qty, unit, foodKey, loc, expiry, est }) {
   const food = BY_KEY[foodKey] || matchFood(name) || matchFood(brand) || OTHER;
   const hasDate = isISO(expiry);
   return {
     id: newId(),
     name: cap(String(name || food.name).trim()).slice(0, 60),
     brand: String(brand || '').trim().slice(0, 40),
-    qty: Number(qty) > 0 ? Math.round(Number(qty) * 100) / 100 : 1,
     unit: UNITS.includes(unit) ? unit : food.unit,
+    qty: Number(qty) > 0 ? Math.round(Number(qty) * 100) / 100 : defaultQty(UNITS.includes(unit) ? unit : food.unit),
     food: food.key,
     icon: food.icon,
     cat: food.cat,
@@ -36,3 +36,22 @@ export const qtyLabel = (item) => {
 
 // Di quanto scende la quantità con il tasto "−"
 export const stepOf = (unit) => (unit === 'g' || unit === 'ml' ? 50 : unit === 'kg' || unit === 'l' ? 0.5 : 1);
+
+// Quantità di partenza quando non è detta
+export const defaultQty = (unit) => (unit === 'g' || unit === 'ml' ? 500 : 1);
+
+const round = (n) => Math.round(n * 1000) / 1000;
+// Porzione proposta per un pasto, nell'unità del cibo
+export function defaultPortion(item, role) {
+  const q = Number(item.qty) || 0;
+  const want = { g: role === 'carb' ? 80 : 150, ml: 200, kg: 0.15, l: 0.2, pz: 1, conf: 1 }[item.unit] || 1;
+  return round(Math.min(q || want, want));
+}
+
+// Testo della porzione: "tutto", "150 g", "2 pz"
+export const portionLabel = (e) => {
+  if (!e || (!e.qty && !e.all)) return '';
+  if (e.all) return 'tutto';
+  const n = String(e.qty).replace('.', ',');
+  return e.unit === 'pz' ? `×${n}` : `${n} ${e.unit}`;
+};
