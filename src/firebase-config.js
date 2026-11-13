@@ -1,12 +1,10 @@
-// Configurazione Firebase di Dimmispensa.
-// Finché i campi sono vuoti l'app funziona in "modalità solo questo dispositivo".
-// Per attivare la sincronizzazione segui GUIDA.md (passo 2): incolla qui i valori
-// che ti mostra Firebase. Non sono segreti: possono stare tranquillamente su GitHub.
+// Configurazione Firebase di Dimmispensa (progetto "dimmispensa").
+// Questi valori non sono segreti: la sicurezza la fanno le regole in firestore.rules.
 export const firebaseConfig = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: '',
+  apiKey: 'AIzaSyB8f6_b0juZIMS9rui3oA39tYUTdI3fzkI',
+  authDomain: 'dimmispensa.firebaseapp.com',
+  projectId: 'dimmispensa',
+  storageBucket: 'dimmispensa.firebasestorage.app',
+  messagingSenderId: '83633146828',
+  appId: '1:83633146828:web:65e7f3db5c4793b8982b69',
 };
