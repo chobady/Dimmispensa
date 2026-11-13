@@ -9,6 +9,7 @@ import Expiry from './screens/Expiry.jsx';
 import Add from './screens/Add.jsx';
 import Meals from './screens/Meals.jsx';
 import Settings from './screens/Settings.jsx';
+import Shopping, { shopItemFrom } from './screens/Shopping.jsx';
 import { Login, PantryChoice } from './screens/Auth.jsx';
 
 const TABS = [
@@ -16,7 +17,8 @@ const TABS = [
   { id: 'scadenze', name: 'Scadenze', icon: '23f0' },
   { id: 'aggiungi', name: 'Aggiungi' },
   { id: 'pasti', name: 'Pasti', icon: '1f4c5' },
-  { id: 'opzioni', name: 'Opzioni', icon: '2699' },
+  { id: 'spesa', name: 'Spesa', icon: '1f6d2' },
+  { id: 'opzioni', name: 'Opzioni', icon: '2699', deskOnly: true },
 ];
 const tabFromHash = () => {
   let h = location.hash.replace('#', '');
@@ -78,6 +80,7 @@ export default function App() {
 
   const removeWithUndo = (item, text) => {
     setOpenId(null);
+    actions.logFinished(item);
     setGoneIds((s) => new Set(s).add(item.id));
     setTimeout(() => {
       actions.removeItem(item.id);
@@ -119,7 +122,8 @@ export default function App() {
 
   const alerts = state.items.filter((i) => ['expired', 'today', 'soon'].includes(expiryStatus(i.expiry, warnDays))).length;
   const openItem = openId ? state.items.find((i) => i.id === openId) : null;
-  const Screen = { dispensa: Pantry, scadenze: Expiry, aggiungi: Add, pasti: Meals, opzioni: Settings }[tab];
+  const toBuy = Object.values(state.shopping || {}).filter((s) => !s.done).length;
+  const Screen = { dispensa: Pantry, scadenze: Expiry, aggiungi: Add, pasti: Meals, spesa: Shopping, opzioni: Settings }[tab];
 
   return (
     <AppCtx.Provider value={ctx}>
@@ -131,6 +135,9 @@ export default function App() {
             <span>{state.pantry?.name}</span>
             <i className={'led ' + (state.online ? '' : 'off')} />
           </span>
+          <button type="button" className={'gear mob-only ' + (tab === 'opzioni' ? 'on' : '')} aria-label="Opzioni" onClick={() => (play('tap'), go('opzioni'))}>
+            <Icon id="2699" size={24} />
+          </button>
         </header>
 
         <main className="screen" key={tab}>
@@ -145,10 +152,11 @@ export default function App() {
                 <span className="add-lbl">Aggiungi cibo</span>
               </button>
             ) : (
-              <button key={t.id} type="button" className={tab === t.id ? 'on' : ''} aria-current={tab === t.id ? 'page' : undefined} onClick={() => (play('tap'), go(t.id))}>
+              <button key={t.id} type="button" className={(tab === t.id ? 'on ' : '') + (t.deskOnly ? 'desk-only' : '')} aria-current={tab === t.id ? 'page' : undefined} onClick={() => (play('tap'), go(t.id))}>
                 <span className="ico"><Icon id={t.icon} size={30} /></span>
                 <span className="nav-lbl">{t.name}</span>
                 {t.id === 'scadenze' && alerts > 0 && <b className="badge" aria-label={`${alerts} cibi da controllare`}>{alerts}</b>}
+                {t.id === 'spesa' && toBuy > 0 && <b className="badge calm" aria-label={`${toBuy} cose da comprare`}>{toBuy}</b>}
               </button>
             )
           )}
@@ -185,6 +193,14 @@ export default function App() {
             }}
             onEaten={() => removeWithUndo(openItem, `${openItem.name}: finito!`)}
             onDelete={() => removeWithUndo(openItem, `${openItem.name}: buttato.`)}
+            onShop={() => {
+              const key = (x) => (x.food && x.food !== 'altro' ? x.food : x.name.toLowerCase());
+              if (Object.values(state.shopping || {}).some((s) => !s.done && key(s) === key(openItem))) return toast('È già nella lista della spesa.');
+              const s = shopItemFrom(openItem, state.user?.name || '');
+              actions.shopSet(s.id, s);
+              play('add');
+              toast(`${openItem.name}: aggiunto alla spesa.`);
+            }}
           />
         )}
       </div>

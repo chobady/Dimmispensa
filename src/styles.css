@@ -488,3 +488,27 @@ html, body { overflow-x: hidden; }
   .hscroll { flex-wrap: wrap; overflow: visible; margin: 0; padding: 4px 0 8px; }
   .entry .pq { font-size: 11px; }
 }
+
+/* ---------- spesa ---------- */
+.shop-list { display: flex; flex-direction: column; gap: 6px; }
+.shop-row { display: flex; align-items: stretch; padding: 0; animation: pop .25s steps(4) both; }
+.shop-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: 0; background: none; padding: 8px 10px; text-align: left; }
+.shop-main .nm { display: block; font-weight: 700; font-size: 18px; line-height: 1.15; overflow-wrap: anywhere; }
+.shop-main .q { display: block; font-size: 14px; color: var(--ink-soft); }
+.check { width: 26px; height: 26px; flex: none; display: grid; place-items: center; background: var(--white); box-shadow: 0 0 0 3px var(--ink); font-weight: 700; font-size: 18px; }
+.check.on { background: var(--yellow); }
+.shop-row.done { background: #ece9d6; }
+.shop-row.done .nm { text-decoration: line-through; text-decoration-thickness: 2px; color: var(--ink-soft); }
+.shop-row.done img { opacity: .5; }
+.shop-x { border: 0; background: none; padding: 0 14px; font-size: 18px; color: var(--ink-soft); border-left: 2px dashed var(--paper-2); }
+.shop-x:hover { color: var(--red-d); }
+.chip.sugg { display: inline-flex; align-items: center; gap: 6px; background: var(--white); }
+.nav .badge.calm { background: var(--yellow); color: var(--ink); animation: none; }
+.gear { margin-left: 4px; border: 0; background: none; padding: 4px; display: grid; place-items: center; }
+.gear.on { background: var(--shell-d); box-shadow: 0 0 0 2px var(--ink); }
+.desk-only { display: none !important; }
+@media (min-width: 900px) {
+  .mob-only { display: none !important; }
+  .nav .desk-only { display: flex !important; }
+  .shop-wrap { max-width: 760px; }
+}

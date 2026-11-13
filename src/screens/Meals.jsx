@@ -443,6 +443,7 @@ function EntrySheet({ date, slot, entry, item, onClose, onRemove }) {
     }
     const snapshot = { ...item };
     if (usesAll) {
+      actions.logFinished(item);
       actions.removeItem(item.id);
       toast(`${entry.name}: mangiato e finito.`, { action: { label: 'Annulla', fn: () => (actions.addItems([snapshot]), setDone(false)) } });
     } else {

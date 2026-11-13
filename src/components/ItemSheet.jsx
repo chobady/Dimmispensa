@@ -18,7 +18,7 @@ const QUICK_DATES = [
   ['+3 mesi', 90],
 ];
 
-export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onClose }) {
+export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onShop, onClose }) {
   const [d, setD] = useState({ ...item });
   const [picking, setPicking] = useState(false);
   const up = (patch) => setD((v) => ({ ...v, ...patch }));
@@ -82,6 +82,7 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onCl
             <Btn color="red" icon="1f5d1" sound="eat" onClick={onDelete}>Buttato</Btn>
           </div>
         )}
+        {!isNew && onShop && <Btn block sm icon="1f6d2" sound={null} onClick={onShop}>Aggiungi alla lista della spesa</Btn>}
         <label className="field">
           <span>Marca (facoltativa)</span>
           <input className="input" value={d.brand || ''} onChange={(e) => up({ brand: e.target.value })} maxLength={40} placeholder="es. Barilla" />

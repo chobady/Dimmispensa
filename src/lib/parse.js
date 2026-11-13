@@ -47,7 +47,7 @@ function takeExpiry(s) {
   return [s, expiry];
 }
 
-function parseChunk(chunk) {
+export function parseChunk(chunk) {
   let s = ' ' + chunk.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9/.,\- ]+/g, ' ') + ' ';
   let loc;
   const locRe = [
@@ -89,6 +89,12 @@ function parseChunk(chunk) {
   if (!norm(name)) return null;
   return makeDraft({ name, qty, unit, loc, expiry, est: false });
 }
+
+export const splitList = (text) =>
+  String(text || '')
+    .split(/[\n;]+|,(?!\d)|\s+e\s+(?=\d|un[oa]?\s|due\s|tre\s)|\s+poi\s+/i)
+    .map((c) => c.trim())
+    .filter(Boolean);
 
 export function parseLocal(text) {
   return String(text || '')
