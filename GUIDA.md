@@ -127,6 +127,41 @@ La chiave viene salvata dentro la tua dispensa su Firebase: la inserisci una vol
 
 ---
 
+## Parte E — Notifiche sul telefono (una volta sola, ~5 minuti)
+
+Le notifiche le manda Vercel ogni mattina verso le 8. Per farlo deve poter leggere le scadenze da Firebase: gli servono tre "variabili" segrete.
+
+### Passo 1 — Prendi la chiave di Firebase
+1. Vai su https://console.firebase.google.com e apri il progetto **dimmispensa**.
+2. In alto a sinistra, l'**ingranaggio** accanto a "Panoramica del progetto" → **Impostazioni progetto**.
+3. Scheda **Account di servizio** → in basso **Genera nuova chiave privata** → **Genera chiave**.
+4. Si scarica un file che finisce con **.json**. Aprilo (con Blocco note / TextEdit) e copia **tutto**, dalla prima `{` all'ultima `}`.
+   Non mandarlo a nessuno e non metterlo su GitHub: è la chiave di casa.
+
+### Passo 2 — Metti le tre variabili su Vercel
+1. Vai su https://vercel.com, apri il progetto **dimmispensa** → **Settings** → **Environment Variables**.
+2. Aggiungi queste tre (per ognuna: scrivi il nome in **Key**, incolla il valore in **Value**, lascia spuntati tutti gli ambienti, **Save**):
+
+| Key | Value |
+|---|---|
+| `FIREBASE_SERVICE_ACCOUNT` | tutto il contenuto del file .json del passo 1 |
+| `VAPID_PRIVATE_KEY` | la chiave che ti ho dato in chat (una riga di lettere e numeri) |
+| `CRON_SECRET` | una parola segreta qualsiasi, lunga, es. `frigo-pieno-2026-banana` |
+
+3. Vai su **Deployments**, sui tre puntini dell'ultimo → **Redeploy** → **Redeploy** (le variabili valgono solo dopo un nuovo deploy).
+
+### Passo 3 — Attiva le notifiche su ogni telefono
+- **iPhone:** l'app deve essere sulla schermata Home (Parte D). Aprila da lì.
+- **Android:** va bene anche da Chrome, meglio se aggiunta alla schermata Home.
+- Nell'app: **⚙ Opzioni → Avvisi → Attiva le notifiche** → consenti. Poi tocca **Prova**: deve arrivare una notifica.
+
+Ogni persona della famiglia le attiva sul suo telefono, con il suo account.
+
+**Se "Prova" dà errore:**
+- "Mancano FIREBASE_SERVICE_ACCOUNT o VAPID_PRIVATE_KEY" → le variabili non ci sono o manca il Redeploy (passo 2.3).
+- "non è un JSON valido" → hai copiato solo un pezzo del file: ricopialo tutto.
+- Nessuna notifica ma nessun errore → controlla che le notifiche per Dimmispensa (o per Chrome) siano permesse nelle impostazioni del telefono.
+
 ## Se qualcosa non va
 
 | Cosa vedi | Cosa è successo | Soluzione |

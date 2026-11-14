@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { currentSubscription, disablePush, enablePush, pushSupport, testPush } from '../lib/push.js';
 import { actions, cloudEnabled, friendlyError, prettyCode } from '../lib/store.js';
 import { forgetModel, GeminiError, testKey } from '../lib/gemini.js';
 import { fillNutrition } from '../lib/nutrition.js';
@@ -159,6 +160,7 @@ export default function Settings() {
           </div>
           <p className="small muted">I cibi entro questo limite diventano gialli e compaiono nel numerino rosso in basso.</p>
         </div>
+        {cloudEnabled && state.user && <NotifyBox />}
         <Btn
           block
           icon={sound ? '1f50a' : '1f507'}
@@ -204,5 +206,86 @@ export default function Settings() {
         Codici a barre: Open Food Facts.
       </p>
     </>
+  );
+}
+
+// Notifiche sul telefono: una al mattino con quello che sta per scadere
+function NotifyBox() {
+  const { toast } = useApp();
+  const support = pushSupport();
+  const [on, setOn] = useState(null); // null = sto controllando
+  const [busy, setBusy] = useState(false);
+  const [days, setDays] = useState(() => Number(localStorage.getItem('dm_notify_days')) || 2);
+  useEffect(() => {
+    currentSubscription()
+      .then((s) => setOn(!!s && Notification.permission === 'granted'))
+      .catch(() => setOn(false));
+  }, []);
+  const changeDays = (n) => {
+    setDays(n);
+    localStorage.setItem('dm_notify_days', String(n));
+    if (on) actions.setNotifyDays(n).catch(() => {});
+  };
+  const run = async (fn) => {
+    setBusy(true);
+    try {
+      await fn();
+    } catch (e) {
+      play('error');
+      toast(e.message || 'Non ci sono riuscito.', { err: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (support === 'ios-home') {
+    return (
+      <div className="notify-box">
+        <b>Notifiche sul telefono</b>
+        <p className="small">Su iPhone le notifiche arrivano solo se l'app è sulla schermata Home: in Safari tocca il tasto Condividi (il quadrato con la freccia), poi "Aggiungi alla schermata Home". Apri Dimmispensa da lì e torna qui.</p>
+      </div>
+    );
+  }
+  if (support === 'no') {
+    return (
+      <div className="notify-box">
+        <b>Notifiche sul telefono</b>
+        <p className="small">Questo browser non supporta le notifiche. Su Android usa Chrome, su iPhone aggiungi l'app alla schermata Home.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="notify-box">
+      <b>Notifiche sul telefono</b>
+      <p className="small">{on ? 'Attive su questo dispositivo: ogni mattina verso le 8 ti scrivo cosa sta per scadere (se c\'è qualcosa).' : 'Ogni mattina verso le 8 ti scrivo cosa sta per scadere. Si attivano dispositivo per dispositivo.'}</p>
+      <div className="field">
+        <span>Per i cibi che scadono entro</span>
+        <div className="stepper">
+          <Btn sm aria-label="Meno giorni" onClick={() => changeDays(Math.max(0, days - 1))}>−</Btn>
+          <span className="val">{days === 0 ? 'oggi' : `${days} ${days === 1 ? 'giorno' : 'giorni'}`}</span>
+          <Btn sm aria-label="Più giorni" onClick={() => changeDays(Math.min(7, days + 1))}>+</Btn>
+        </div>
+      </div>
+      {on ? (
+        <div className="two">
+          <Btn sm icon="1f514" disabled={busy} onClick={() => run(async () => {
+            const r = await testPush();
+            toast(r.sent ? 'Notifica di prova mandata!' : 'Non sono riuscito a mandarla: disattiva e riattiva le notifiche.', r.sent ? {} : { err: true });
+          })}>Prova</Btn>
+          <Btn sm color="red" icon="1f507" disabled={busy} onClick={() => run(async () => {
+            await disablePush();
+            setOn(false);
+            toast('Notifiche spente su questo dispositivo.');
+          })}>Spegni</Btn>
+        </div>
+      ) : (
+        <Btn color="yellow" block icon="1f514" disabled={busy || on === null} onClick={() => run(async () => {
+          await enablePush(days);
+          setOn(true);
+          play('add');
+          toast('Notifiche attive! Tocca Prova per vederne una.');
+        })}>Attiva le notifiche</Btn>
+      )}
+    </div>
   );
 }

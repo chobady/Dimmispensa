@@ -182,6 +182,27 @@ export function friendlyError(e) {
 }
 
 const cloud = {
+  // notifiche: ogni dispositivo salva la sua "iscrizione" nel documento dell'utente
+  async savePush(id, sub, days) {
+    const { db, F } = fb;
+    const uid = state.user?.uid;
+    if (!uid) throw new Error('Entra con il tuo account per attivare le notifiche.');
+    await F.setDoc(F.doc(db, 'users', uid), { push: { [id]: { sub, ua: navigator.userAgent.slice(0, 120), at: Date.now() } }, notifyDays: days }, { merge: true });
+  },
+  async removePush(id) {
+    const { db, F } = fb;
+    const uid = state.user?.uid;
+    if (!uid) return;
+    await F.updateDoc(F.doc(db, 'users', uid), new F.FieldPath('push', id), F.deleteField()).catch(() => {});
+  },
+  async setNotifyDays(days) {
+    const { db, F } = fb;
+    const uid = state.user?.uid;
+    if (uid) await F.setDoc(F.doc(db, 'users', uid), { notifyDays: days }, { merge: true });
+  },
+  async idToken() {
+    return fb?.auth?.currentUser ? fb.auth.currentUser.getIdToken() : '';
+  },
   async start() {
     try {
       const [appMod, authMod, fsMod] = await Promise.all([import('firebase/app'), import('firebase/auth'), import('firebase/firestore')]);
@@ -450,4 +471,8 @@ export const actions = {
   joinPantry: cloud.joinPantry,
   leavePantry: cloud.leavePantry,
   renamePantry: cloud.renamePantry,
+  savePush: cloud.savePush,
+  removePush: cloud.removePush,
+  setNotifyDays: cloud.setNotifyDays,
+  idToken: cloud.idToken,
 };
