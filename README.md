@@ -45,4 +45,6 @@ npm run icons    # rigenera src/icons-data.js dopo aver cambiato le icone
 
 I dati dei codici a barre arrivano da [Open Food Facts](https://world.openfoodfacts.org) (licenza ODbL) e, per i prodotti americani, da [USDA FoodData Central](https://fdc.nal.usda.gov) (pubblico dominio).
 I valori medi dei cibi sfusi vengono dalla tabella [Ciqual 2025](https://ciqual.anses.fr/) di ANSES (Licence Ouverte): "Anses. 2025. Ciqual French food composition table."
+
+Le offerte dei volantini (Spesa → Volantini) vengono lette dalle pagine pubbliche di [PromoQui](https://www.promoqui.it) tramite la funzione `api/offerte.js`, solo per uso personale. Se un giorno smette di funzionare, apri `/api/offerte?c=latte&debug=1` sul tuo sito per vedere cosa risponde PromoQui.
 I font sono Press Start 2P e Pixelify Sans (licenza OFL).

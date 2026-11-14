@@ -580,6 +580,8 @@ html, body { overflow-x: hidden; }
 .offer-row.match { background: #fff1b8; }
 .offer-row .price { display: flex; flex-direction: column; align-items: flex-end; flex: none; }
 .offer-row .price b { font-family: var(--font-title); font-size: 11px; color: var(--red-d); }
+.offer-row .q a { color: var(--shell); font-weight: 700; }
+.small.blink { animation: blink 1s steps(2) infinite; }
 .offer-row .price s { font-size: 13px; color: var(--ink-soft); }
 .offer-add { border: 0; width: 34px; height: 34px; flex: none; background: var(--yellow); font-family: var(--font-title); font-size: 13px; box-shadow: 0 0 0 3px var(--ink), inset -3px -3px 0 var(--yellow-d); }
 .offer-add:disabled { background: var(--paper-2); box-shadow: 0 0 0 3px var(--ink-soft); }
