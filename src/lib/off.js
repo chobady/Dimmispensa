@@ -1,6 +1,7 @@
 // Ricerca di un prodotto dal codice a barre su Open Food Facts (gratis, senza chiave).
 import { matchFood } from '../catalog.js';
-import { makeDraft } from './items.js';
+import { cleanNutr, makeDraft } from './items.js';
+import { norm } from '../catalog.js';
 import { codeVariants } from './barcode.js';
 
 const FIELDS = 'product_name,product_name_it,product_name_en,generic_name_it,generic_name,brands,quantity,product_quantity,product_quantity_unit,categories_tags,nutriments';
@@ -38,9 +39,45 @@ export async function lookupBarcode(code) {
     if (unit === 'g' && qty >= 1000) [qty, unit] = [qty / 1000, 'kg'];
     if (unit === 'ml' && qty >= 1000) [qty, unit] = [qty / 1000, 'l'];
   }
-  const n = p.nutriments || {};
-  const nutr = { kcal: n['energy-kcal_100g'], p: n.proteins_100g, c: n.carbohydrates_100g, f: n.fat_100g };
-  return makeDraft({ name, brand, qty, unit, foodKey: food?.key, nutr });
+  const nutr = labelNutr(p);
+  return makeDraft({ name, brand, qty, unit, foodKey: food?.key, nutr, nutrSrc: 'etichetta', code });
+}
+
+// Valori nutrizionali stampati in etichetta (per 100 g/ml), se Open Food Facts li ha
+export function labelNutr(p) {
+  const n = p?.nutriments || {};
+  return cleanNutr({ kcal: n['energy-kcal_100g'], p: n.proteins_100g, c: n.carbohydrates_100g, f: n.fat_100g });
+}
+
+// Solo i valori dell'etichetta di un codice già noto (per i cibi già in dispensa)
+export async function labelByCode(code) {
+  for (const c of codeVariants(code)) {
+    const p = await fetchProduct(c);
+    if (p) return labelNutr(p);
+  }
+  return null;
+}
+
+// Cerca l'etichetta di un prodotto di marca dal nome (es. scontrino "Yogurt greco Fage").
+// Accetta il risultato solo se la marca coincide e il nome ha almeno una parola in comune: meglio niente che un prodotto sbagliato.
+export async function labelByName(name, brand) {
+  const b = norm(brand);
+  if (!b || b.length < 2) return null;
+  const terms = `${brand} ${name}`.trim();
+  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(terms)}&search_simple=1&action=process&json=1&page_size=5&fields=product_name,product_name_it,product_name_en,brands,nutriments`;
+  const r = await fetch(url);
+  if (!r.ok) return null;
+  const data = await r.json().catch(() => ({}));
+  const words = norm(name).split(' ').filter((w) => w.length > 3);
+  for (const p of data.products || []) {
+    const pb = norm(p.brands);
+    const pn = norm(`${p.product_name_it || ''} ${p.product_name || ''} ${p.product_name_en || ''}`);
+    const brandOk = pb && (pb.includes(b) || b.includes(pb.split(' ')[0]));
+    const nameOk = !words.length || words.some((w) => pn.includes(w.slice(0, -1)));
+    const nutr = labelNutr(p);
+    if (brandOk && nameOk && nutr && nutr.p !== null && nutr.c !== null && nutr.f !== null) return nutr;
+  }
+  return null;
 }
 
 // Le categorie di Open Food Facts sono spesso in inglese: piccola tabella di traduzione

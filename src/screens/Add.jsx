@@ -7,6 +7,7 @@ import QtyPicker, { unitFamily } from '../components/QtyPicker.jsx';
 import { parseLocal } from '../lib/parse.js';
 import { fileToJpegBase64, itemsFromReceipt, itemsFromText, lookupBarcodeOnline, readBarcodeDigits } from '../lib/gemini.js';
 import { decodeImageFile, getDecoder, crop, validCode } from '../lib/barcode.js';
+import { fillNutrition, nutrComplete } from '../lib/nutrition.js';
 import { lookupBarcode } from '../lib/off.js';
 import { play } from '../lib/sound.js';
 import ItemSheet from '../components/ItemSheet.jsx';
@@ -207,6 +208,8 @@ function Write({ geminiKey, onDrafts }) {
       if (geminiKey) {
         try {
           list = await itemsFromText(geminiKey, text);
+          // prodotti di marca: se trovo l'etichetta vera, uso quella al posto della stima di Gemini
+          list = (await fillNutrition(list, geminiKey, { byCode: false }).catch(() => ({ list }))).list;
         } catch (e) {
           toast(e.message + ' Per ora leggo io la lista.', { err: true });
           list = parseLocal(text);
@@ -273,7 +276,8 @@ function Receipt({ geminiKey, onDrafts }) {
     try {
       const img = await fileToJpegBase64(file);
       setPreview(img.preview);
-      const list = await itemsFromReceipt(geminiKey, img.base64, img.mime);
+      let list = await itemsFromReceipt(geminiKey, img.base64, img.mime);
+      list = (await fillNutrition(list, geminiKey, { byCode: false }).catch(() => ({ list }))).list;
       if (!list.length) {
         play('error');
         toast('Non ho trovato cibi in questa foto. Prova con una foto più nitida.', { err: true });
@@ -365,6 +369,11 @@ function Barcode({ onDrafts }) {
         online = !!draft;
       }
       if (draft) {
+        // etichetta prima di tutto; Gemini solo per i valori che mancano
+        if (!nutrComplete(draft.nutr) || draft.nutrSrc !== 'etichetta') {
+          setStatus('Cerco i valori nutrizionali...');
+          draft = (await fillNutrition([draft], geminiKey, { byCode: false, byName: online }).catch(() => ({ list: [draft] }))).list[0];
+        }
         play('open');
         setUnknown(null);
         setStatus('');

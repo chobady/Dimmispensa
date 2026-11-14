@@ -150,6 +150,8 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
             <p className="small muted">
               Per 100 {d.unit === 'ml' || d.unit === 'l' ? 'ml' : 'g'}:{' '}
               {[d.nutr.kcal != null && `${fmtN(d.nutr.kcal)} kcal`, d.nutr.p != null && `proteine ${fmtN(d.nutr.p)} g`, d.nutr.c != null && `carboidrati ${fmtN(d.nutr.c)} g`, d.nutr.f != null && `grassi ${fmtN(d.nutr.f)} g`].filter(Boolean).join(' · ')}
+              <br />
+              {d.nutrSrc === 'etichetta' ? 'Dati dell’etichetta (Open Food Facts).' : d.nutrSrc === 'misto' ? 'Etichetta, completata da Gemini dove mancava.' : d.nutrSrc === 'gemini' ? 'Stima di Gemini: valori tipici, non della tua confezione.' : ''}
             </p>
           )}
         </div>

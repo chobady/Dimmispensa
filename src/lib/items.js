@@ -24,7 +24,7 @@ export function macroFromNutr(n) {
   return Object.entries(e).sort((a, b) => b[1] - a[1])[0][0];
 }
 
-export function makeDraft({ name, brand = '', qty, unit, foodKey, loc, expiry, est, macro, nutr }) {
+export function makeDraft({ name, brand = '', qty, unit, foodKey, loc, expiry, est, macro, nutr, nutrSrc, code }) {
   const food = BY_KEY[foodKey] || matchFood(name) || matchFood(brand) || OTHER;
   const hasDate = isISO(expiry);
   return {
@@ -40,7 +40,8 @@ export function makeDraft({ name, brand = '', qty, unit, foodKey, loc, expiry, e
     // senza data: stima dalla durata tipica (nel freezer dura di più)
     expiry: hasDate ? expiry : food.days ? addDays(loc === 'freezer' && food.loc !== 'freezer' ? Math.max(food.days, 90) : food.days) : null,
     est: hasDate ? !!est : !!food.days,
-    ...(cleanNutr(nutr) ? { nutr: cleanNutr(nutr) } : {}),
+    ...(cleanNutr(nutr) ? { nutr: cleanNutr(nutr), nutrSrc: nutrSrc || 'gemini' } : {}),
+    ...(code ? { code: String(code) } : {}),
     // macronutriente: detto da Gemini/etichetta, altrimenti calcolato dai valori, altrimenti quello del catalogo
     ...(MACRO_IDS.includes(macro) ? { macro } : macro === 'nessuno' ? { macro: null } : macroFromNutr(cleanNutr(nutr)) !== undefined ? { macro: macroFromNutr(cleanNutr(nutr)) } : {}),
   };
