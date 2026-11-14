@@ -108,6 +108,15 @@ const local = {
     lsSet(field === 'offers' ? 'dm_offers' : 'dm_links', map);
     set({ [field]: map });
   },
+  async mapSetMany(field, pairs) {
+    const map = { ...state[field] };
+    for (const [id, value] of pairs) {
+      if (value) map[id] = value;
+      else delete map[id];
+    }
+    lsSet(field === 'offers' ? 'dm_offers' : 'dm_links', map);
+    set({ [field]: map });
+  },
   async shopSet(id, value) {
     const shopping = { ...state.shopping };
     if (value) shopping[id] = value;
@@ -355,6 +364,22 @@ const cloud = {
     set({ [field]: map });
     F.updateDoc(F.doc(db, 'pantries', state.pantry.id), new F.FieldPath(field, id), value || F.deleteField()).catch(reportWriteError);
   },
+  // tante voci in poche scritture (es. un volantino intero)
+  async mapSetMany(field, pairs) {
+    if (!pairs.length) return;
+    const { db, F } = fb;
+    const map = { ...state[field] };
+    for (const [id, value] of pairs) {
+      if (value) map[id] = value;
+      else delete map[id];
+    }
+    set({ [field]: map });
+    const ref = F.doc(db, 'pantries', state.pantry.id);
+    for (let i = 0; i < pairs.length; i += 200) {
+      const args = pairs.slice(i, i + 200).flatMap(([id, v]) => [new F.FieldPath(field, id), v || F.deleteField()]);
+      F.updateDoc(ref, ...args).catch(reportWriteError);
+    }
+  },
   // un campo per voce: due persone possono spuntare cose diverse insieme senza sovrascriversi
   async shopSet(id, value) {
     const { db, F } = fb;
@@ -406,7 +431,7 @@ export const actions = {
   setMealSlot: (date, slot, list) => impl.setMealSlot(date, slot, list),
   shopSet: (id, value) => impl.shopSet(id, value),
   offerSet: (id, value) => impl.mapSet('offers', id, value),
-  offerSetMany: (pairs) => pairs.forEach(([id, v]) => impl.mapSet('offers', id, v)),
+  offerSetMany: (pairs) => impl.mapSetMany('offers', pairs),
   linkSet: (id, value) => impl.mapSet('flyerLinks', id, value),
   // più voci insieme (es. "Metti in dispensa" o "Togli spuntati")
   shopSetMany: (pairs) => pairs.forEach(([id, v]) => impl.shopSet(id, v)),

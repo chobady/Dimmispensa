@@ -5,7 +5,7 @@ import { makeDraft, newId, qtyLabel } from '../lib/items.js';
 import { parseChunk, splitList } from '../lib/parse.js';
 import { play } from '../lib/sound.js';
 import { Btn, Icon, SectionTitle, Talk, useApp } from '../components/ui.jsx';
-import Flyers, { bestOfferFor } from './Flyers.jsx';
+import Flyers, { bestOfferFor, myStoreSlugs } from './Flyers.jsx';
 
 const HAS_QTY = /\d|\b(un|uno|una|due|tre|quattro|cinque|sei|sette|otto|nove|dieci|mezzo)\b/i;
 
@@ -154,8 +154,9 @@ export default function Shopping() {
     mood = 'happy';
   } else say = `Ti ${todo.length === 1 ? 'manca 1 cosa' : 'mancano ' + todo.length + ' cose'}. Tocca una voce quando la metti nel carrello.`;
 
+  const mySlugs = myStoreSlugs(state.flyerLinks);
   const Row = ({ s }) => {
-    const deal = !s.done ? bestOfferFor(s, state.offers) : null;
+    const deal = !s.done ? bestOfferFor(s, state.offers, mySlugs) : null;
     return (
     <div className={'win flat shop-row ' + (s.done ? 'done' : '')}>
       <button type="button" className="shop-main" onClick={() => toggle(s)} aria-pressed={s.done} aria-label={`${s.name}${s.done ? ', preso' : ''}`}>
