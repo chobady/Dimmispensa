@@ -291,3 +291,56 @@ ${list}`;
   }
   return out;
 }
+
+// Offerte lette da un volantino (foto, screenshot o PDF)
+export async function offersFromFlyer(key, files, { store = '', until = '' } = {}) {
+  const schema = {
+    type: 'OBJECT',
+    properties: {
+      negozio: { type: 'STRING' },
+      valido_fino: { type: 'STRING' },
+      offerte: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            nome: { type: 'STRING' },
+            marca: { type: 'STRING' },
+            prezzo: { type: 'NUMBER' },
+            prezzo_prima: { type: 'NUMBER' },
+            formato: { type: 'STRING' },
+            tipo: { type: 'STRING' },
+          },
+          required: ['nome', 'prezzo'],
+        },
+      },
+    },
+    required: ['offerte'],
+  };
+  const prompt = `Sei l'assistente di un'app per la spesa. Oggi è ${todayISO()}.
+Ecco ${files.length > 1 ? 'alcune pagine di un volantino' : 'un volantino'} di un supermercato italiano. Estrai SOLO le offerte di cibo e bevande (ignora detersivi, casa, elettronica, abbigliamento).
+Rispondi SOLO con JSON {"negozio": "...", "valido_fino": "AAAA-MM-GG", "offerte": [{"nome","marca","prezzo","prezzo_prima","formato","tipo"}]}.
+- "negozio": la catena (es. Conad, Esselunga, Lidl)${store ? `; l'utente dice che è "${store}"` : ''}.
+- "valido_fino": l'ultimo giorno di validità del volantino se è scritto${until ? ` (l'utente dice ${until})` : ''}, altrimenti "".
+- "nome": nome breve in italiano senza marca (es. "Mozzarella"); "marca": la marca o "".
+- "prezzo": prezzo in offerta in euro (numero); "prezzo_prima": prezzo pieno se indicato, altrimenti 0.
+- "formato": quantità della confezione come scritta (es. "125 g", "6 x 1,5 l"), altrimenti "".
+- "tipo": la chiave più adatta presa ESATTAMENTE da questo elenco, oppure "altro": ${TIPI}.`;
+  const parts = [{ text: prompt }, ...files.map((f) => ({ inline_data: { mime_type: f.mime, data: f.base64 } }))];
+  const json = parseJSON(await generate(key, parts, schema));
+  return {
+    store: String(json.negozio || store || '').trim(),
+    until: /^\d{4}-\d{2}-\d{2}$/.test(json.valido_fino || '') ? json.valido_fino : until || '',
+    offers: (json.offerte || []).filter((o) => o && o.nome && Number(o.prezzo) > 0),
+  };
+}
+
+// Legge un PDF come base64 (per i volantini scaricati dal sito del supermercato)
+export function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve({ base64: String(r.result).split(',')[1], mime: file.type || 'application/pdf' });
+    r.onerror = () => reject(new Error('Non riesco a leggere il file.'));
+    r.readAsDataURL(file);
+  });
+}

@@ -12,6 +12,16 @@ const LS_MEALS = 'dm_meals';
 const LS_SHOP = 'dm_shop';
 const LS_FIN = 'dm_finished';
 const MAX_FINISHED = 30; // ricordo gli ultimi 30 cibi finiti, per proporli nella spesa
+// offerte scadute da più di un giorno: si cancellano da sole
+const expiredOffers = (offers) => {
+  const cut = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  return Object.entries(offers || {}).filter(([, o]) => o && o.until && o.until < cut).map(([k]) => k);
+};
+const pruneOffers = (offers) => {
+  const out = { ...offers };
+  expiredOffers(out).forEach((k) => delete out[k]);
+  return out;
+};
 const oldFinished = (fin) => Object.entries(fin || {}).sort((a, b) => (b[1].at || 0) - (a[1].at || 0)).slice(MAX_FINISHED).map(([k]) => k);
 const KEEP_DAYS = 60; // il calendario tiene gli ultimi 60 giorni
 
@@ -26,6 +36,8 @@ let state = {
   user: null, // { uid, email, name }
   pantry: null, // { id, name, members, memberNames, geminiKey }
   items: [],
+  offers: {}, // offerte lette dai volantini: { id: { name, brand, price, oldPrice, size, until, store, food, icon } }
+  flyerLinks: {}, // supermercati preferiti: { id: { name, url } }
   shopping: {}, // { id: { id, name, qty, unit, food, icon, cat, done, by, addedAt } }
   finished: {}, // { chiave: { name, food, icon, unit, cat, at } } ultimi cibi finiti
   meals: {}, // { 'AAAA-MM-GG': { colazione: [...], snack: [...], pranzo: [...], cena: [...] } }
@@ -66,11 +78,13 @@ const local = {
   start() {
     const meals = lsGet(LS_MEALS, {});
     oldMealDays(meals).forEach((d) => delete meals[d]);
-    set({ phase: 'ready', pantry: { id: 'local', name: 'La mia dispensa', local: true, geminiKey: lsGet(LS_KEY, ''), usdaKey: lsGet(LS_USDA, '') }, items: lsGet(LS_ITEMS, []), meals, shopping: lsGet(LS_SHOP, {}), finished: lsGet(LS_FIN, {}) });
+    set({ phase: 'ready', pantry: { id: 'local', name: 'La mia dispensa', local: true, geminiKey: lsGet(LS_KEY, ''), usdaKey: lsGet(LS_USDA, '') }, items: lsGet(LS_ITEMS, []), meals, shopping: lsGet(LS_SHOP, {}), finished: lsGet(LS_FIN, {}), offers: pruneOffers(lsGet('dm_offers', {})), flyerLinks: lsGet('dm_links', {}) });
     window.addEventListener('storage', (e) => {
       if (e.key === LS_ITEMS) set({ items: lsGet(LS_ITEMS, []) });
       if (e.key === LS_MEALS) set({ meals: lsGet(LS_MEALS, {}) });
       if (e.key === LS_SHOP) set({ shopping: lsGet(LS_SHOP, {}) });
+      if (e.key === 'dm_offers') set({ offers: lsGet('dm_offers', {}) });
+      if (e.key === 'dm_links') set({ flyerLinks: lsGet('dm_links', {}) });
     });
   },
   save(items) {
@@ -86,6 +100,13 @@ const local = {
   },
   async removeItem(id) {
     local.save(state.items.filter((it) => it.id !== id));
+  },
+  async mapSet(field, id, value) {
+    const map = { ...state[field] };
+    if (value) map[id] = value;
+    else delete map[id];
+    lsSet(field === 'offers' ? 'dm_offers' : 'dm_links', map);
+    set({ [field]: map });
   },
   async shopSet(id, value) {
     const shopping = { ...state.shopping };
@@ -211,13 +232,14 @@ const cloud = {
       (snap) => {
         if (!snap.exists()) return;
         const data = snap.data();
-        set({ pantry: { id: pid, ...data }, meals: data.meals || {}, shopping: data.shopping || {}, finished: data.finished || {}, phase: 'ready' });
+        set({ pantry: { id: pid, ...data }, meals: data.meals || {}, shopping: data.shopping || {}, finished: data.finished || {}, offers: data.offers || {}, flyerLinks: data.flyerLinks || {}, phase: 'ready' });
         // pulizia: i giorni più vecchi di 2 mesi vengono tolti (una volta per sessione)
         const old = oldMealDays(data.meals);
         const oldFin = oldFinished(data.finished);
-        if ((old.length || oldFin.length) && !cloud.pruned) {
+        const oldOff = expiredOffers(data.offers);
+        if ((old.length || oldFin.length || oldOff.length) && !cloud.pruned) {
           cloud.pruned = true;
-          const args = [...old.map((d) => new F.FieldPath('meals', d)), ...oldFin.map((k) => new F.FieldPath('finished', k))].flatMap((fp) => [fp, F.deleteField()]);
+          const args = [...old.map((d) => new F.FieldPath('meals', d)), ...oldFin.map((k) => new F.FieldPath('finished', k)), ...oldOff.map((k) => new F.FieldPath('offers', k))].flatMap((fp) => [fp, F.deleteField()]);
           F.updateDoc(F.doc(db, 'pantries', pid), ...args).catch((e) => console.error(e));
         }
       },
@@ -325,6 +347,14 @@ const cloud = {
   async removeItem(id) {
     fb.F.deleteDoc(cloud.itemRef(id)).catch(reportWriteError);
   },
+  async mapSet(field, id, value) {
+    const { db, F } = fb;
+    const map = { ...state[field] };
+    if (value) map[id] = value;
+    else delete map[id];
+    set({ [field]: map });
+    F.updateDoc(F.doc(db, 'pantries', state.pantry.id), new F.FieldPath(field, id), value || F.deleteField()).catch(reportWriteError);
+  },
   // un campo per voce: due persone possono spuntare cose diverse insieme senza sovrascriversi
   async shopSet(id, value) {
     const { db, F } = fb;
@@ -375,6 +405,9 @@ export const actions = {
   setUsdaKey: (key) => impl.setUsdaKey(key),
   setMealSlot: (date, slot, list) => impl.setMealSlot(date, slot, list),
   shopSet: (id, value) => impl.shopSet(id, value),
+  offerSet: (id, value) => impl.mapSet('offers', id, value),
+  offerSetMany: (pairs) => pairs.forEach(([id, v]) => impl.mapSet('offers', id, v)),
+  linkSet: (id, value) => impl.mapSet('flyerLinks', id, value),
   // più voci insieme (es. "Metti in dispensa" o "Togli spuntati")
   shopSetMany: (pairs) => pairs.forEach(([id, v]) => impl.shopSet(id, v)),
   logFinished: (item) => {

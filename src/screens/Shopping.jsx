@@ -5,6 +5,7 @@ import { makeDraft, newId, qtyLabel } from '../lib/items.js';
 import { parseChunk, splitList } from '../lib/parse.js';
 import { play } from '../lib/sound.js';
 import { Btn, Icon, SectionTitle, Talk, useApp } from '../components/ui.jsx';
+import Flyers, { bestOfferFor } from './Flyers.jsx';
 
 const HAS_QTY = /\d|\b(un|uno|una|due|tre|quattro|cinque|sei|sette|otto|nove|dieci|mezzo)\b/i;
 
@@ -46,6 +47,21 @@ const shopLabel = (s) => (s.qty ? qtyLabel({ qty: s.qty, unit: s.unit }) : '');
 export default function Shopping() {
   const { state, toast } = useApp();
   const [text, setText] = useState('');
+  const [tab, setTab] = useState(() => {
+    try {
+      return localStorage.getItem('dm_shoptab') || 'lista';
+    } catch {
+      return 'lista';
+    }
+  });
+  const pickTab = (t) => {
+    play('tap');
+    setTab(t);
+    try {
+      localStorage.setItem('dm_shoptab', t);
+    } catch {}
+  };
+  const nOffers = Object.values(state.offers || {}).filter((o) => !o.until || o.until >= new Date().toISOString().slice(0, 10)).length;
   const me = state.user?.name || '';
   const list = useMemo(() => Object.values(state.shopping || {}).sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0)), [state.shopping]);
   const todo = list.filter((s) => !s.done);
@@ -138,7 +154,9 @@ export default function Shopping() {
     mood = 'happy';
   } else say = `Ti ${todo.length === 1 ? 'manca 1 cosa' : 'mancano ' + todo.length + ' cose'}. Tocca una voce quando la metti nel carrello.`;
 
-  const Row = ({ s }) => (
+  const Row = ({ s }) => {
+    const deal = !s.done ? bestOfferFor(s, state.offers) : null;
+    return (
     <div className={'win flat shop-row ' + (s.done ? 'done' : '')}>
       <button type="button" className="shop-main" onClick={() => toggle(s)} aria-pressed={s.done} aria-label={`${s.name}${s.done ? ', preso' : ''}`}>
         <span className={'check ' + (s.done ? 'on' : '')} aria-hidden="true">{s.done ? '✓' : ''}</span>
@@ -152,14 +170,32 @@ export default function Shopping() {
               {s.by && s.by !== me ? `da ${s.by}` : ''}
             </span>
           )}
+          {deal && (
+            <span className="deal">
+              In offerta da {deal.store}: {deal.price.toFixed(2).replace('.', ',')} €{deal.brand ? ` (${deal.brand})` : ''}
+            </span>
+          )}
         </span>
       </button>
       <button type="button" className="shop-x" onClick={() => remove(s)} aria-label={`Togli ${s.name}`}>✕</button>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="shop-wrap">
+      <div className="seg" role="tablist" aria-label="Spesa" style={{ marginBottom: 14 }}>
+        <button type="button" role="tab" aria-selected={tab === 'lista'} className={tab === 'lista' ? 'on' : ''} onClick={() => pickTab('lista')}>
+          <Icon id="1f4dd" size={20} /> Lista {todo.length ? `(${todo.length})` : ''}
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'volantini'} className={tab === 'volantini' ? 'on' : ''} onClick={() => pickTab('volantini')}>
+          <Icon id="1f525" size={20} /> Volantini {nOffers ? `(${nOffers})` : ''}
+        </button>
+      </div>
+      {tab === 'volantini' ? (
+        <Flyers shopList={list} />
+      ) : (
+      <>
       <Talk text={say} mood={mood} />
 
       <form className="row" onSubmit={submit}>
@@ -222,6 +258,8 @@ export default function Shopping() {
             ))}
           </div>
         </section>
+      )}
+      </>
       )}
     </div>
   );
