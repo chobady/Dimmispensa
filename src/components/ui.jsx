@@ -116,17 +116,28 @@ export function SectionTitle({ children, icon }) {
   );
 }
 
+// Blocco lo scorrimento della pagina finché c'è almeno una finestra aperta.
+// Conto le finestre: con due finestre una dopo l'altra la pagina restava bloccata (su Android si nota, su iPhone no).
+let openSheets = 0;
+const lockScroll = () => {
+  openSheets++;
+  document.body.classList.add('no-scroll');
+};
+const unlockScroll = () => {
+  openSheets = Math.max(0, openSheets - 1);
+  if (!openSheets) document.body.classList.remove('no-scroll');
+};
+
 export function Sheet({ title, onClose, children }) {
   const ref = useRef(null);
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    ref.current?.focus();
+    lockScroll();
+    ref.current?.focus({ preventScroll: true });
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+      unlockScroll();
     };
   }, []);
   // portal: la finestra va sopra a tutto, anche alla barra in basso

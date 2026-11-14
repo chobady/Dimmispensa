@@ -38,7 +38,6 @@ body {
   background-size: 16px 16px;
   background-position: 0 0, 8px 8px;
   -webkit-tap-highlight-color: transparent;
-  overscroll-behavior-y: none;
 }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -324,7 +323,9 @@ img.ghost { opacity: .3; }
 .stepper .val { padding: 0 8px; }
 .mini { min-width: 0; }
 .card .grow { min-width: 0; }
-html, body { overflow-x: hidden; }
+/* solo il body, e con clip: overflow su html e body insieme fa del body un riquadro che scorre da sé, e su Chrome Android lo scorrimento si blocca */
+body { overflow-x: hidden; overflow-x: clip; }
+body.no-scroll { overflow: hidden; }
 
 /* ======================================================================
    Computer: la console si apre "di lato". Menu a sinistra, contenuto largo.
