@@ -135,14 +135,17 @@ export default function Flyers({ shopList }) {
 
   // volantino intero di un supermercato
   const loadStore = async (st, { quiet = false } = {}) => {
-    const data = await api(`store=${encodeURIComponent(st.slug)}${st.flyer ? '&flyer=' + st.flyer : ''}`);
+    // le cose della lista vengono cercate per prime anche nel piano B
+    const extra = todo.slice(0, 15).flatMap((it) => candidates(it.name, it.food).slice(-2)).join('|');
+    const flyer = st.flyer && !(st.until && st.until < todayISO()) ? st.flyer : '';
+    const data = await api(`store=${encodeURIComponent(st.slug)}${flyer ? '&flyer=' + flyer : ''}${extra ? '&extra=' + encodeURIComponent(extra) : ''}`);
     const until = data.until && data.until >= todayISO() ? data.until : addDays(7);
     const fresh = (data.offers || []).slice(0, 250).map((o, i) => toOffer(o, { store: st.name, storeSlug: st.slug, until, tag: 'fl:' + st.slug }, i));
     replaceTag('fl:' + st.slug, fresh);
-    actions.linkSet(st.id, { ...st, flyer: '', flyerId: data.flyer || '', title: data.title || '', from: data.from || '', until: data.until || '', url: data.url || st.url, fetchedAt: Date.now(), count: fresh.length });
+    actions.linkSet(st.id, { ...st, flyer, mode: data.mode || '', flyerId: data.flyer || '', title: data.title || '', from: data.from || '', until: data.until || '', url: data.url || st.url, fetchedAt: Date.now(), count: fresh.length });
     if (!quiet) {
       play(fresh.length ? 'add' : 'error');
-      toast(fresh.length ? `${st.name}: ${fresh.length} offerte nel volantino.` : `${st.name}: non riesco a leggere le offerte di questo volantino.`, fresh.length ? {} : { err: true });
+      toast(fresh.length ? `${st.name}: ${fresh.length} offerte${data.mode === 'ricerca' ? ' di cibo trovate' : ' nel volantino'}.` : `${st.name}: non riesco a leggere le offerte di questo volantino.`, fresh.length ? {} : { err: true });
     }
     return fresh.length;
   };
@@ -322,7 +325,7 @@ export default function Flyers({ shopList }) {
               <button type="button" className={'store-main ' + (only === st.slug ? 'on' : '')} onClick={() => (setOnly(only === st.slug ? '' : st.slug), setView('tutte'), setQ(''))} aria-pressed={only === st.slug}>
                 <b>{st.name}</b>
                 <span className="small muted">
-                  {n ? `${n} offerte` : 'nessuna offerta letta'}
+                  {n ? `${n} offerte${st.mode === 'ricerca' ? ' di cibo' : ''}` : 'nessuna offerta letta'}
                   {st.until ? ` · fino al ${shortDate(st.until)}` : ''}
                 </span>
               </button>

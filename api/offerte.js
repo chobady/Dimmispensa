@@ -2,6 +2,7 @@
 // Vercel lo pubblica da solo come /api/offerte. Non salva niente.
 //   /api/offerte?c=latte-parzialmente-scremato|latte        → prova le pagine in ordine, si ferma alla prima con offerte
 //   /api/offerte?c=latte&debug=1                             → mostra cosa ha visto, utile se un giorno smette di funzionare
+export const config = { maxDuration: 25 };
 const BASE = 'https://www.promoqui.it';
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
 
@@ -240,6 +241,12 @@ function flyerDates(html) {
 }
 const titleOf = (html) => decode((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || '').trim();
 
+const SWEEP = ('latte yogurt mozzarella formaggio parmigiano-reggiano grana-padano burro uova prosciutto-cotto prosciutto-crudo salame mortadella wurstel ' +
+  'pollo petto-di-pollo carne-macinata salsiccia hamburger tonno salmone salmone-affumicato merluzzo bastoncini-di-pesce pasta riso pane biscotti cereali ' +
+  'farina zucchero caffe te olio-extravergine-di-oliva passata-di-pomodoro legumi ceci fagioli mele banane arance clementine pomodori patate insalata ' +
+  'zucchine carote cipolle finocchi gelato pizza surgelati acqua birra vino succo-di-frutta cioccolato merendine patatine nutella marmellata pesto ' +
+  'maionese tortellini gnocchi panettone pandoro').split(' ');
+
 async function flyerHandler(q, res, debug) {
   let store = slugify(q.store || '');
   let id = String(q.flyer || '').replace(/\D/g, '');
@@ -255,8 +262,8 @@ async function flyerHandler(q, res, debug) {
     // pagina della catena: prendo il volantino più recente
     const sp = await fetchHtml(`/volantino/${store}`);
     info.storeStatus = sp.status;
-    if (!sp.html) {
-      res.status(sp.status === 404 ? 404 : 502).json({ error: sp.status === 404 ? 'Supermercato non trovato su PromoQui' : 'PromoQui non risponde', ...(debug ? { info } : {}) });
+    if (!sp.html && sp.status === 404) {
+      res.status(404).json({ error: 'Supermercato non trovato su PromoQui', ...(debug ? { info } : {}) });
       return;
     }
     const ids = [...sp.html.matchAll(new RegExp(`/volantino/${store}/(\\d+)`, 'g'))].map((m) => m[1]);
@@ -264,18 +271,11 @@ async function flyerHandler(q, res, debug) {
     id = ids[0] || '';
     dates = flyerDates(sp.html);
     chainHtml = sp.html;
-    if (!id) {
-      res.status(200).json({ store, offers: [], error: 'Nessun volantino attivo', ...(debug ? { info, sample: sp.html.slice(0, 4000) } : {}) });
-      return;
-    }
+    if (debug) info.chainSample = sp.html.slice(0, 2000);
   }
-  const fp = await fetchHtml(`/volantino/${store}/${id}`);
+  const fp = id ? await fetchHtml(`/volantino/${store}/${id}`) : { status: 0, html: '' };
   info.flyerStatus = fp.status;
   info.size = fp.html.length;
-  if (!fp.html) {
-    res.status(502).json({ error: 'Volantino non raggiungibile', ...(debug ? { info } : {}) });
-    return;
-  }
   flyerTitle = titleOf(fp.html);
   const d2 = flyerDates(fp.html);
   if (d2.until) dates = d2;
@@ -300,16 +300,41 @@ async function flyerHandler(q, res, debug) {
       url: o.url || `${BASE}/volantino/${store}/${id}`,
     });
   }
+  // Piano B: se il volantino non si legge, cerco prodotto per prodotto (pagine che funzionano) e tengo solo questo negozio
+  let mode = 'volantino';
+  if (offers.length < 15) {
+    const extra = String(q.extra || '').split('|').map(slugify).filter((x) => x && x.length <= 40);
+    const slugs = [...new Set([...extra, ...SWEEP])].slice(0, 70);
+    const t0 = Date.now();
+    let swept = 0;
+    for (let i = 0; i < slugs.length && Date.now() - t0 < 15000; i += 10) {
+      const pages = await Promise.all(slugs.slice(i, i + 10).map((sl) => getPage(sl).catch(() => ({ html: '' }))));
+      for (const pg of pages) {
+        swept++;
+        for (const o of pg.html ? parseOffers(pg.html) : []) {
+          if (o.storeSlug !== store) continue;
+          const k = `${slugify(o.name)}|${o.price}`;
+          if (seen.has(k)) continue;
+          seen.add(k);
+          offers.push({ name: o.name, brand: o.brand, price: o.price, oldPrice: o.oldPrice, discount: o.discount || (o.oldPrice ? Math.round((1 - o.price / o.oldPrice) * 100) : null), url: o.url });
+          if (!id && o.flyer) id = o.flyer;
+        }
+      }
+    }
+    info.swept = swept;
+    mode = 'ricerca';
+  }
   const storeName = (flyerTitle.match(/volantino\s+([^|–-]+?)(?:\s+(?:a|dal|valido|\||–|-)|$)/i) || [])[1] || '';
   res.setHeader('Cache-Control', offers.length ? 's-maxage=21600, stale-while-revalidate=86400' : 's-maxage=600');
   res.status(200).json({
     store,
     storeName: storeName.trim(),
     flyer: id,
+    mode,
     title: flyerTitle,
     from: dates.from || '',
     until: dates.until || '',
-    url: `${BASE}/volantino/${store}/${id}`,
+    url: `${BASE}/volantino/${store}${id ? "/" + id : ""}`,
     offers: offers.slice(0, 300),
     ...(debug ? { info, sample: fp.html.slice(0, 5000), scripts: [...fp.html.matchAll(/<script\b([^>]*)>([\s\S]{0,300})/gi)].map((m) => (m[1] + ' ' + m[2]).slice(0, 300)).slice(0, 40) } : {}),
   });
