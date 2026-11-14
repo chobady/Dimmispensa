@@ -3,14 +3,16 @@ import { ICONS } from '../icons-data.js';
 import { CATALOG, CATEGORIES, LOCATIONS, MACROS, UNITS, macroOf } from '../catalog.js';
 import { addDays, expiryLabel } from '../lib/dates.js';
 import { stepOf } from '../lib/items.js';
-import { Btn, Icon, Sheet } from './ui.jsx';
+import { Btn, Icon, Sheet, useApp } from './ui.jsx';
+import MacroPanel from './MacroPie.jsx';
+import { sumMacros } from '../lib/macros.js';
+import { fillNutrition } from '../lib/nutrition.js';
+import { actions } from '../lib/store.js';
 
 // Icone "da cibo": prima quelle usate dal catalogo, poi tutte le altre del pack
 const UI_ONLY = new Set(['1f4c5', '1f4f7', '1f3a4', '2699', '1f5d1', '2b50', '1f3b2', '1f50d', '270f', '2705', '274c', '2795', '26a0', '1f480', '1f525', '1f3e0', '23f0', '2764', '1f4a4', '1f511', '1f465', '1f50a', '1f507', '2728', '1f916', '1f6aa', '1f517', '1f4dd', '1f514', '1f4a1', '231b', '1f44d', '1f389', '1f47b', '2328', '1f319', '2600', '1f4f1', '1f4be', '1f504', '1f3ae', '1f579', '1f451', '1f4aa', '1f60b', '1f634', '1f6d2', '1f9fe', '1f37d', '1f374', '1f331', '1f332', '1f333', '1f334', '1f335', '1f337', '1f338', '1f339', '1f33a', '1f33b', '1f33c', '1f33e', '1f340', '1f341', '1f342', '1f343']);
 const catalogIcons = [...new Set(CATALOG.map((f) => f.icon))];
 const ALL_ICONS = [...catalogIcons, ...Object.keys(ICONS).filter((k) => !catalogIcons.includes(k) && !UI_ONLY.has(k))];
-
-const fmtN = (n) => String(Math.round(n * 10) / 10).replace('.', ',');
 
 const QUICK_DATES = [
   ['+3 g', 3],
@@ -23,6 +25,23 @@ const QUICK_DATES = [
 export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onShop, onClose }) {
   const [d, setD] = useState({ ...item, macro: macroOf(item) });
   const [picking, setPicking] = useState(false);
+  const { state, toast } = useApp();
+  const [finding, setFinding] = useState(false);
+  const findValues = async () => {
+    setFinding(true);
+    try {
+      const { list } = await fillNutrition([{ ...item, ...d }], state.pantry?.geminiKey, { usdaKey: state.pantry?.usdaKey });
+      const x = list[0];
+      if (x.nutr) {
+        setD((v) => ({ ...v, nutr: x.nutr, nutrSrc: x.nutrSrc, macro: x.macro ?? v.macro }));
+        if (!isNew) actions.updateItem(item.id, { nutr: x.nutr, nutrSrc: x.nutrSrc, macro: x.macro ?? null });
+      } else toast(state.pantry?.geminiKey ? 'Non ho trovato valori per questo cibo.' : 'Etichetta non trovata. Con la chiave Gemini posso stimare i valori.', { err: true });
+    } catch (e) {
+      toast(e.message || 'Ricerca non riuscita.', { err: true });
+    } finally {
+      setFinding(false);
+    }
+  };
   const up = (patch) => setD((v) => ({ ...v, ...patch }));
   const step = stepOf(d.unit);
 
@@ -146,13 +165,18 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
               </button>
             ))}
           </div>
-          {d.nutr && (
-            <p className="small muted">
-              Per 100 {d.unit === 'ml' || d.unit === 'l' ? 'ml' : 'g'}:{' '}
-              {[d.nutr.kcal != null && `${fmtN(d.nutr.kcal)} kcal`, d.nutr.p != null && `proteine ${fmtN(d.nutr.p)} g`, d.nutr.c != null && `carboidrati ${fmtN(d.nutr.c)} g`, d.nutr.f != null && `grassi ${fmtN(d.nutr.f)} g`].filter(Boolean).join(' · ')}
-              <br />
-              {d.nutrSrc === 'etichetta' ? 'Dati dell’etichetta (Open Food Facts).' : d.nutrSrc === 'misto' ? 'Etichetta, completata da Gemini dove mancava.' : d.nutrSrc === 'gemini' ? 'Stima di Gemini: valori tipici, non della tua confezione.' : ''}
-            </p>
+          {d.nutr ? (
+            <div className="win flat" style={{ marginTop: 8 }}>
+              <MacroPanel totals={sumMacros([{ name: d.name, nutr: d.nutr, grams: 100 }])} perLabel={`per 100 ${d.unit === 'ml' || d.unit === 'l' ? 'ml' : 'g'}`} />
+              <p className="small muted" style={{ marginTop: 6 }}>
+                {d.nutrSrc === 'etichetta' ? 'Dati dell’etichetta (Open Food Facts o USDA).' : d.nutrSrc === 'misto' ? 'Etichetta, completata da Gemini dove mancava.' : d.nutrSrc === 'gemini' ? 'Stima di Gemini: valori tipici, non della tua confezione.' : ''}
+              </p>
+            </div>
+          ) : (
+            <div className="row" style={{ marginTop: 4 }}>
+              <p className="small muted grow">Mancano i valori nutrizionali, quindi niente grafico.</p>
+              <Btn sm icon="1f50d" disabled={finding} onClick={findValues}>{finding ? 'Cerco...' : 'Trova i valori'}</Btn>
+            </div>
           )}
         </div>
 

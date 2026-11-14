@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CATALOG, CATEGORIES, LOCATIONS, PRESETS, norm } from '../catalog.js';
+import { CATALOG, CATEGORIES, LOCATIONS, PRESETS, matchFood, norm } from '../catalog.js';
 import { actions } from '../lib/store.js';
 import { defaultQty, draftFromFood, makeDraft, qtyLabel } from '../lib/items.js';
 import { addDays, expiryLabel } from '../lib/dates.js';
@@ -8,6 +8,7 @@ import { parseLocal } from '../lib/parse.js';
 import { fileToJpegBase64, itemsFromReceipt, itemsFromText, lookupBarcodeOnline, readBarcodeDigits } from '../lib/gemini.js';
 import { decodeImageFile, getDecoder, crop, validCode } from '../lib/barcode.js';
 import { fillNutrition, nutrComplete } from '../lib/nutrition.js';
+import { usdaProductByCode } from '../lib/usda.js';
 import { lookupBarcode } from '../lib/off.js';
 import { play } from '../lib/sound.js';
 import ItemSheet from '../components/ItemSheet.jsx';
@@ -164,7 +165,8 @@ function Quick() {
 
 // ------------------------------------------------------------------ scrivi o detta
 function Write({ geminiKey, onDrafts }) {
-  const { toast, go } = useApp();
+  const { toast, go, state } = useApp();
+  const usdaKey = state.pantry?.usdaKey || '';
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
@@ -209,7 +211,7 @@ function Write({ geminiKey, onDrafts }) {
         try {
           list = await itemsFromText(geminiKey, text);
           // prodotti di marca: se trovo l'etichetta vera, uso quella al posto della stima di Gemini
-          list = (await fillNutrition(list, geminiKey, { byCode: false }).catch(() => ({ list }))).list;
+          list = (await fillNutrition(list, geminiKey, { byCode: false, usdaKey: usdaKey }).catch(() => ({ list }))).list;
         } catch (e) {
           toast(e.message + ' Per ora leggo io la lista.', { err: true });
           list = parseLocal(text);
@@ -262,7 +264,7 @@ function Write({ geminiKey, onDrafts }) {
 
 // ------------------------------------------------------------------ foto dello scontrino
 function Receipt({ geminiKey, onDrafts }) {
-  const { toast, go } = useApp();
+  const { toast, go, state } = useApp();
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(null);
   const camRef = useRef(null);
@@ -277,7 +279,7 @@ function Receipt({ geminiKey, onDrafts }) {
       const img = await fileToJpegBase64(file);
       setPreview(img.preview);
       let list = await itemsFromReceipt(geminiKey, img.base64, img.mime);
-      list = (await fillNutrition(list, geminiKey, { byCode: false }).catch(() => ({ list }))).list;
+      list = (await fillNutrition(list, geminiKey, { byCode: false, usdaKey: state.pantry?.usdaKey }).catch(() => ({ list }))).list;
       if (!list.length) {
         play('error');
         toast('Non ho trovato cibi in questa foto. Prova con una foto più nitida.', { err: true });
@@ -362,6 +364,12 @@ function Barcode({ onDrafts }) {
     try {
       let draft = await lookupBarcode(code);
       let online = false;
+      if (!draft) {
+        // non è in Open Food Facts: provo la banca dati USDA (molti prodotti americani)
+        setStatus(`${code} non è in Open Food Facts, provo USDA...`);
+        const u = await usdaProductByCode(state.pantry?.usdaKey, code).catch(() => null);
+        if (u && u.name) draft = makeDraft({ name: u.name, brand: u.brand, qty: u.qty, unit: u.unit, foodKey: (matchFood(u.name) || {}).key, nutr: u.nutr, nutrSrc: 'etichetta', code });
+      }
       if (!draft && geminiKey) {
         // non è in Open Food Facts (capita spesso con i prodotti USA): Gemini lo cerca su Google
         setStatus(`${code} non è in archivio, lo cerco su internet...`);
@@ -372,7 +380,7 @@ function Barcode({ onDrafts }) {
         // etichetta prima di tutto; Gemini solo per i valori che mancano
         if (!nutrComplete(draft.nutr) || draft.nutrSrc !== 'etichetta') {
           setStatus('Cerco i valori nutrizionali...');
-          draft = (await fillNutrition([draft], geminiKey, { byCode: false, byName: online }).catch(() => ({ list: [draft] }))).list[0];
+          draft = (await fillNutrition([{ ...draft, code }], geminiKey, { byCode: online, byName: online, usdaKey: state.pantry?.usdaKey }).catch(() => ({ list: [draft] }))).list[0];
         }
         play('open');
         setUnknown(null);

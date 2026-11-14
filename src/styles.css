@@ -519,9 +519,41 @@ html, body { overflow-x: hidden; }
 .macro { display: inline-grid; place-items: center; width: 16px; height: 16px; font-family: var(--font-title); font-size: 8px; padding-top: 1px; margin-right: 6px; vertical-align: 1px; box-shadow: 0 0 0 2px var(--ink); color: var(--ink); }
 .macro.m-proteine { background: #ff8a7a; }
 .macro.m-carboidrati { background: var(--yellow); }
-.macro.m-grassi { background: #f6a85a; }
+.macro.m-grassi { background: #6fb7e8; }
 .macro.m-fibre { background: #8fd477; }
 .macro-filter { margin-top: 10px; }
 .macro-filter .chip { display: inline-flex; align-items: center; }
 .macro-seg button { font-size: 14px; flex-direction: column; gap: 4px; padding: 7px 2px; }
 .macro-seg .macro { margin: 0; }
+
+/* ---------- torta dei macronutrienti ---------- */
+.macro-panel { display: flex; flex-direction: column; gap: 8px; }
+.mp-body { display: flex; align-items: center; gap: 14px; }
+.mp-legend { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mp-row { display: flex; align-items: center; gap: 8px; font-size: 16px; }
+.mp-row i { width: 14px; height: 14px; flex: none; box-shadow: 0 0 0 2px var(--ink); }
+.mp-row .mp-name { flex: 1; min-width: 0; }
+.mp-row b { font-family: var(--font-title); font-size: 10px; }
+.mp-row .muted { width: 54px; text-align: right; font-size: 14px; }
+.mp-kcal { font-weight: 700; margin-top: 2px; }
+.mp-mode button { font-size: 14px; padding: 6px 4px; }
+.macro-panel.compact .mp-row { font-size: 13px; gap: 5px; }
+.macro-panel.compact .mp-row i { width: 10px; height: 10px; }
+.macro-panel.compact .mp-row b { font-size: 8px; }
+.macro-panel.compact .mp-kcal { font-size: 14px; }
+.mp-missing { margin: 0; }
+.day-total { padding: 10px 12px; }
+.meal-kcal { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink-soft); font-weight: 600; }
+@media (min-width: 900px) {
+  .day-total { padding: 6px; margin: 3px; }
+  .day-total .mp-body { flex-direction: column; gap: 6px; }
+  .day-total .mp-legend { width: 100%; }
+  .day-total .mp-row { font-size: 12px; }
+  .day-total .mp-missing { font-size: 11px; }
+}
+@media (min-width: 900px) {
+  .day-total .mp-mode, .day-total .mp-row .muted { display: none; }
+  .day-total .label { font-size: 12px; }
+}
+.meal-kcal { white-space: nowrap; }
+@media (min-width: 900px) { .meal-kcal { font-size: 10px; } }

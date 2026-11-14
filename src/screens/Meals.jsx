@@ -4,6 +4,8 @@ import { actions } from '../lib/store.js';
 import { addDays, daysLeft, expiryLabel, expiryStatus, fromISO, todayISO, toISO } from '../lib/dates.js';
 import { defaultPortion, newId, portionLabel, qtyLabel } from '../lib/items.js';
 import QtyPicker from '../components/QtyPicker.jsx';
+import MacroPanel from '../components/MacroPie.jsx';
+import { portionGrams, sumMacros } from '../lib/macros.js';
 import { play } from '../lib/sound.js';
 import { Btn, Icon, Sheet, Talk, useApp } from '../components/ui.jsx';
 import { byExpiry } from './Pantry.jsx';
@@ -66,8 +68,18 @@ function weightedPick(list, warnDays, exclude = new Set()) {
 const entryFrom = (item, portion) => {
   const p = portion || { qty: defaultPortion(item, roleOf(item)), unit: item.unit };
   const all = p.all || Number(p.qty) >= Number(item.qty);
-  return { id: newId(), item: item.id, name: item.name, icon: item.icon, unit: item.unit, qty: all ? Number(item.qty) : Number(p.qty), all };
+  return { id: newId(), item: item.id, food: item.food || null, name: item.name, icon: item.icon, unit: item.unit, qty: all ? Number(item.qty) : Number(p.qty), all, ...(item.nutr ? { nutr: item.nutr } : {}) };
 };
+
+// Righe pesate per i conti: valori dal cibo in dispensa (se c'è ancora) o salvati nella voce del pasto
+const macroRows = (entries, itemsById) =>
+  (entries || [])
+    .filter((e) => e.item || e.nutr)
+    .map((e) => {
+      const it = e.item ? itemsById[e.item] : null;
+      const nutr = (it && it.nutr) || e.nutr || null;
+      return { name: e.name, nutr, grams: portionGrams(e.qty, e.unit, e.food || (it && it.food)) };
+    });
 
 // Quanto ne resta in dispensa togliendo le porzioni già programmate (dal giorno indicato in poi)
 const reservedFor = (meals, itemId, fromDate, skipEntryId) => {
@@ -193,6 +205,7 @@ export default function Meals() {
                 onEntry={(entry) => (play('open'), setEntryOpen({ date: d, slot: s.id, entry }))}
               />
             ))}
+            <DayTotal entries={SLOTS.flatMap((s) => meals[d]?.[s.id] || [])} itemsById={itemsById} />
           </section>
         ))}
       </div>
@@ -223,11 +236,13 @@ export default function Meals() {
 }
 
 function MealSlot({ date, slot, entries, itemsById, onAdd, onEntry }) {
+  const kcal = sumMacros(macroRows(entries, itemsById)).kcal;
   return (
     <div className="win flat meal">
       <div className="meal-head">
         <Icon id={slot.icon} size={20} />
         <span className="meal-name">{slot.name}</span>
+        {kcal > 0 && <span className="meal-kcal">{Math.round(kcal)} kcal</span>}
         <button type="button" className="meal-add" onClick={onAdd} aria-label={`Aggiungi a ${slot.name}`}>+</button>
       </div>
       {entries.length > 0 && (
@@ -500,5 +515,16 @@ function EntrySheet({ date, slot, entry, item, onClose, onRemove }) {
         <Btn color="red" block icon="274c" onClick={onRemove}>Togli da questo pasto</Btn>
       </div>
     </Sheet>
+  );
+}
+
+function DayTotal({ entries, itemsById }) {
+  const rows = macroRows(entries, itemsById);
+  if (!rows.length) return null;
+  const totals = sumMacros(rows);
+  return (
+    <div className="win flat day-total">
+      <MacroPanel totals={totals} title="Macronutrienti del giorno" />
+    </div>
   );
 }

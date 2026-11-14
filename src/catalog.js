@@ -476,3 +476,16 @@ for (const f of CATALOG) {
 
 // Macronutriente di un cibo in dispensa: quello salvato (da Gemini/etichetta) o quello del catalogo
 export const macroOf = (item) => (item.macro !== undefined && item.macro !== '' ? item.macro : BY_KEY[item.food]?.macro || null);
+
+// Peso medio di un pezzo (g o ml): serve per pesare nei pasti i cibi contati a pezzi
+export const PIECE_G = {
+  uova: 60, mela: 180, melaverde: 180, pera: 170, banana: 120, arancia: 150, limone: 100, kiwi: 75, pesca: 150, prugna: 60, fico: 50,
+  avocado: 170, pomodoro: 120, zucchina: 200, melanzana: 300, peperone: 160, cetriolo: 300, cipolla: 120, carota: 80, patatadolce: 200,
+  finocchio: 250, carciofo: 150, sedano: 400, porro: 200, cavolfiore: 600, broccoli: 400, radicchio: 250, ananas: 1000, melone: 1200,
+  mango: 300, cocco: 500, mozzarella: 125, yogurt: 125, budino: 100, formaggio: 200, burro: 250, parmigiano: 300, salame: 200,
+  hamburger: 100, bistecca: 250, costata: 600, pollointero: 1200, polpo: 800, pesce: 400, kebab: 350, aragosta: 500, ostriche: 15,
+  pane: 100, baguette: 250, croissant: 50, muffin: 80, ciambella: 70, sandwich: 150, pizza: 300, pizzasurgelata: 350, torta: 800,
+  crostata: 500, cioccolato: 100, birra: 330, bibita: 330, succo: 200, vino: 750, acqua: 1500, latte: 1000, piattopronto: 350,
+  avanzi: 300, asporto: 400, passata: 700, pesto: 190, maionese: 225, ketchup: 300, miele: 500, marmellata: 340, cremanocciola: 400,
+  olio: 1000, aceto: 500, insalatapronta: 250,
+};

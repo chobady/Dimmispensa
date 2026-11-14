@@ -2,6 +2,7 @@
 import { classifyItems } from './gemini.js';
 import { macroFromNutr } from './items.js';
 import { labelByCode, labelByName } from './off.js';
+import { usdaByCode, usdaByName } from './usda.js';
 
 // L'etichetta è "completa" se ha proteine, carboidrati e grassi
 export const nutrComplete = (n) => !!n && n.p !== null && n.c !== null && n.f !== null;
@@ -25,7 +26,7 @@ function merge(label, gem) {
  * 1) etichetta dal codice a barre, 2) etichetta cercata per marca + nome, 3) Gemini per quello che resta.
  * Restituisce { lista aggiornata, conteggi }.
  */
-export async function fillNutrition(list, geminiKey, { byCode = true, byName = true, maxName = 12, onStep } = {}) {
+export async function fillNutrition(list, geminiKey, { byCode = true, byName = true, maxName = 12, onStep, usdaKey = '', code: forcedCode } = {}) {
   const out = list.map((x) => ({ ...x }));
   const stats = { etichetta: 0, gemini: 0 };
   let nameSearches = 0; // Open Food Facts limita le ricerche per nome: ne faccio al massimo maxName
@@ -34,14 +35,22 @@ export async function fillNutrition(list, geminiKey, { byCode = true, byName = t
     if (x.nutrSrc === 'etichetta' && nutrComplete(x.nutr)) continue;
     let label = x.nutrSrc === 'etichetta' ? x.nutr : null;
     try {
-      if (!nutrComplete(label) && byCode && x.code) {
+      const code = x.code || forcedCode;
+      // 1) Open Food Facts per codice (se non l'abbiamo già fatto), 2) USDA per codice
+      if (!nutrComplete(label) && byCode && code) {
         onStep && onStep(`Leggo l'etichetta di ${x.name}...`);
-        label = (await labelByCode(x.code)) || label;
+        label = (await labelByCode(code).catch(() => null)) || label;
       }
+      if (!nutrComplete(label) && code) {
+        onStep && onStep(`Cerco ${x.name} nella banca dati USDA...`);
+        label = (await usdaByCode(usdaKey, code).catch(() => null)) || label;
+      }
+      // 3) Open Food Facts e 4) USDA per marca + nome
       if (!nutrComplete(label) && byName && x.brand && nameSearches < maxName) {
         nameSearches++;
         onStep && onStep(`Cerco l'etichetta di ${x.name}...`);
-        label = (await labelByName(x.name, x.brand)) || label;
+        label = (await labelByName(x.name, x.brand).catch(() => null)) || label;
+        if (!nutrComplete(label)) label = (await usdaByName(usdaKey, x.name, x.brand).catch(() => null)) || label;
       }
     } catch {}
     if (nutrComplete(label)) {

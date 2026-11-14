@@ -7,6 +7,7 @@ export const cloudEnabled = !!(firebaseConfig && firebaseConfig.apiKey && fireba
 
 const LS_ITEMS = 'dm_items';
 const LS_KEY = 'dm_gemini_key';
+const LS_USDA = 'dm_usda_key';
 const LS_MEALS = 'dm_meals';
 const LS_SHOP = 'dm_shop';
 const LS_FIN = 'dm_finished';
@@ -65,7 +66,7 @@ const local = {
   start() {
     const meals = lsGet(LS_MEALS, {});
     oldMealDays(meals).forEach((d) => delete meals[d]);
-    set({ phase: 'ready', pantry: { id: 'local', name: 'La mia dispensa', local: true, geminiKey: lsGet(LS_KEY, '') }, items: lsGet(LS_ITEMS, []), meals, shopping: lsGet(LS_SHOP, {}), finished: lsGet(LS_FIN, {}) });
+    set({ phase: 'ready', pantry: { id: 'local', name: 'La mia dispensa', local: true, geminiKey: lsGet(LS_KEY, ''), usdaKey: lsGet(LS_USDA, '') }, items: lsGet(LS_ITEMS, []), meals, shopping: lsGet(LS_SHOP, {}), finished: lsGet(LS_FIN, {}) });
     window.addEventListener('storage', (e) => {
       if (e.key === LS_ITEMS) set({ items: lsGet(LS_ITEMS, []) });
       if (e.key === LS_MEALS) set({ meals: lsGet(LS_MEALS, {}) });
@@ -110,6 +111,10 @@ const local = {
   async setGeminiKey(key) {
     lsSet(LS_KEY, key);
     set({ pantry: { ...state.pantry, geminiKey: key } });
+  },
+  async setUsdaKey(key) {
+    lsSet(LS_USDA, key);
+    set({ pantry: { ...state.pantry, usdaKey: key } });
   },
 };
 
@@ -346,6 +351,9 @@ const cloud = {
     set({ meals });
     F.updateDoc(ref, new F.FieldPath('meals', date, slot), value).catch(reportWriteError);
   },
+  async setUsdaKey(key) {
+    await fb.F.updateDoc(fb.F.doc(fb.db, 'pantries', state.pantry.id), { usdaKey: key });
+  },
   async setGeminiKey(key) {
     await fb.F.updateDoc(fb.F.doc(fb.db, 'pantries', state.pantry.id), { geminiKey: key });
   },
@@ -364,6 +372,7 @@ export const actions = {
   updateItem: (id, patch) => impl.updateItem(id, patch),
   removeItem: (id) => impl.removeItem(id),
   setGeminiKey: (key) => impl.setGeminiKey(key),
+  setUsdaKey: (key) => impl.setUsdaKey(key),
   setMealSlot: (date, slot, list) => impl.setMealSlot(date, slot, list),
   shopSet: (id, value) => impl.shopSet(id, value),
   // più voci insieme (es. "Metti in dispensa" o "Togli spuntati")
