@@ -259,7 +259,9 @@ export function matchFood(text) {
 export const roleOf = (item) => {
   const f = BY_KEY[item.food];
   if (f) return f.role;
-  return CAT_ROLE[item.cat] || 'extra';
+  // cibi fuori catalogo: mai trattati come condimenti, così si possono mettere nei pasti
+  const r = CAT_ROLE[item.cat] || 'extra';
+  return r === 'cond' ? 'extra' : r;
 };
 
 // Quantità proposte con un tocco, per unità

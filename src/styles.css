@@ -557,3 +557,14 @@ html, body { overflow-x: hidden; }
 }
 .meal-kcal { white-space: nowrap; }
 @media (min-width: 900px) { .meal-kcal { font-size: 10px; } }
+
+/* avviso: valori stimati da Gemini */
+.src-warn { display: flex; gap: 10px; align-items: flex-start; background: #fff1b8; padding: 10px; margin: 2px 2px 12px; box-shadow: 0 0 0 3px var(--yellow-d); }
+.src-warn.unknown { background: #f1ede0; box-shadow: 0 0 0 3px var(--ink-soft); }
+.src-warn b { display: block; font-size: 17px; margin-bottom: 2px; }
+.src-warn p { margin: 0 0 6px; }
+.src-warn .btn { margin-left: 4px; }
+.src-note { margin: 8px 0 0; background: #fff1b8; padding: 6px 8px; box-shadow: 0 0 0 2px var(--yellow-d); }
+
+.mp-row .mp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-row b { min-width: 42px; text-align: right; flex: none; }

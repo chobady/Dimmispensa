@@ -68,7 +68,7 @@ function weightedPick(list, warnDays, exclude = new Set()) {
 const entryFrom = (item, portion) => {
   const p = portion || { qty: defaultPortion(item, roleOf(item)), unit: item.unit };
   const all = p.all || Number(p.qty) >= Number(item.qty);
-  return { id: newId(), item: item.id, food: item.food || null, name: item.name, icon: item.icon, unit: item.unit, qty: all ? Number(item.qty) : Number(p.qty), all, ...(item.nutr ? { nutr: item.nutr } : {}) };
+  return { id: newId(), item: item.id, food: item.food || null, name: item.name, icon: item.icon, unit: item.unit, qty: all ? Number(item.qty) : Number(p.qty), all, ...(item.nutr ? { nutr: item.nutr, nutrSrc: item.nutrSrc || '' } : {}) };
 };
 
 // Righe pesate per i conti: valori dal cibo in dispensa (se c'è ancora) o salvati nella voce del pasto
@@ -78,7 +78,8 @@ const macroRows = (entries, itemsById) =>
     .map((e) => {
       const it = e.item ? itemsById[e.item] : null;
       const nutr = (it && it.nutr) || e.nutr || null;
-      return { name: e.name, nutr, grams: portionGrams(e.qty, e.unit, e.food || (it && it.food)) };
+      const src = (it && it.nutr ? it.nutrSrc : e.nutrSrc) || (nutr ? '' : undefined);
+      return { name: e.name, nutr, src, grams: portionGrams(e.qty, e.unit, e.food || (it && it.food)) };
     });
 
 // Quanto ne resta in dispensa togliendo le porzioni già programmate (dal giorno indicato in poi)
@@ -274,7 +275,7 @@ function Picker({ date, slot, entries, plannedIds, onClose, onRemove }) {
   const [portionFor, setPortionFor] = useState(null);
   const slotInfo = SLOTS.find((s) => s.id === slot);
   const inSlot = new Set(entries.map((e) => e.item).filter(Boolean));
-  const edible = state.items.filter((i) => expiryStatus(i.expiry, warnDays) !== 'expired' && roleOf(i) !== 'cond').sort(byExpiry);
+  const edible = state.items.filter((i) => expiryStatus(i.expiry, warnDays) !== 'expired').sort(byExpiry);
   const nq = norm(q);
   const shown = edible.filter((i) => !nq || norm(i.name + ' ' + (i.brand || '')).includes(nq));
   const urgent = shown.filter((i) => ['today', 'soon'].includes(expiryStatus(i.expiry, warnDays)));
@@ -522,9 +523,15 @@ function DayTotal({ entries, itemsById }) {
   const rows = macroRows(entries, itemsById);
   if (!rows.length) return null;
   const totals = sumMacros(rows);
+  const guessed = rows.filter((r) => r.nutr && r.grams && (r.src === 'gemini' || r.src === 'misto' || r.src === '')).map((r) => r.name);
   return (
     <div className="win flat day-total">
       <MacroPanel totals={totals} title="Macronutrienti del giorno" />
+      {guessed.length > 0 && (
+        <p className="small src-note" role="note">
+          <Icon id="26a0" size={16} className="inline" /> Valori stimati da Gemini per: {guessed.join(', ')}.
+        </p>
+      )}
     </div>
   );
 }

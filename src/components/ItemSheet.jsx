@@ -31,7 +31,15 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
   const findValues = async () => {
     setFinding(true);
     try {
-      const { list } = await fillNutrition([{ ...item, ...d }], state.pantry?.geminiKey, { usdaKey: state.pantry?.usdaKey });
+      const base = { ...item, ...d };
+      // se ora c'è una stima di Gemini, la metto da parte: prima cerco etichetta e tabella
+      const hadGuess = base.nutr && base.nutrSrc !== 'etichetta' && base.nutrSrc !== 'tabella';
+      const probe = hadGuess ? { ...base, nutr: undefined, nutrSrc: undefined } : base;
+      let { list } = await fillNutrition([probe], hadGuess ? '' : state.pantry?.geminiKey, { usdaKey: state.pantry?.usdaKey });
+      if (hadGuess && !list[0].nutr) {
+        toast('Nessuna etichetta né tabella per questo cibo: restano i valori stimati.');
+        list = [base];
+      }
       const x = list[0];
       if (x.nutr) {
         setD((v) => ({ ...v, nutr: x.nutr, nutrSrc: x.nutrSrc, macro: x.macro ?? v.macro }));
@@ -168,9 +176,25 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
           </div>
           {d.nutr ? (
             <div className="win flat" style={{ marginTop: 8 }}>
+              {(d.nutrSrc === 'gemini' || d.nutrSrc === 'misto' || !d.nutrSrc) && (
+                <div className={'src-warn ' + (d.nutrSrc ? '' : 'unknown')} role="note">
+                  <Icon id="26a0" size={24} />
+                  <div className="grow">
+                    <b>{d.nutrSrc === 'gemini' ? 'Valori stimati da Gemini' : d.nutrSrc === 'misto' ? 'Valori in parte stimati da Gemini' : 'Fonte dei valori sconosciuta'}</b>
+                    <p className="small">
+                      {d.nutrSrc === 'gemini'
+                        ? 'Non vengono da un’etichetta né da una tabella ufficiale: sono valori tipici, possono essere diversi dalla tua confezione.'
+                        : d.nutrSrc === 'misto'
+                        ? 'L’etichetta aveva solo alcuni valori: quelli mancanti li ha stimati Gemini.'
+                        : 'Questo cibo è stato aggiunto prima che l’app registrasse la fonte: potrebbe essere una stima di Gemini.'}
+                    </p>
+                    <Btn sm icon="1f50d" disabled={finding} onClick={findValues}>{finding ? 'Cerco...' : 'Cerca etichetta o tabella'}</Btn>
+                  </div>
+                </div>
+              )}
               <MacroPanel totals={sumMacros([{ name: d.name, nutr: d.nutr, grams: 100 }])} perLabel={`per 100 ${d.unit === 'ml' || d.unit === 'l' ? 'ml' : 'g'}`} />
               <p className="small muted" style={{ marginTop: 6 }}>
-                {d.nutrSrc === 'tabella' ? `Valori medi dalla tabella ufficiale Ciqual (ANSES): ${CIQUAL[d.food]?.n || 'alimento generico'}.` : d.nutrSrc === 'etichetta' ? 'Dati dell’etichetta (Open Food Facts o USDA).' : d.nutrSrc === 'misto' ? 'Etichetta, completata da Gemini dove mancava.' : d.nutrSrc === 'gemini' ? 'Stima di Gemini: valori tipici, non della tua confezione.' : ''}
+                {d.nutrSrc === 'tabella' ? `Valori medi dalla tabella ufficiale Ciqual (ANSES): ${CIQUAL[d.food]?.n || 'alimento generico'}.` : d.nutrSrc === 'etichetta' ? 'Dati dell’etichetta (Open Food Facts o USDA).' : ''}
               </p>
             </div>
           ) : (
