@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ICONS } from '../icons-data.js';
-import { CATALOG, CATEGORIES, LOCATIONS, UNITS } from '../catalog.js';
+import { CATALOG, CATEGORIES, LOCATIONS, MACROS, UNITS, macroOf } from '../catalog.js';
 import { addDays, expiryLabel } from '../lib/dates.js';
 import { stepOf } from '../lib/items.js';
 import { Btn, Icon, Sheet } from './ui.jsx';
@@ -9,6 +9,8 @@ import { Btn, Icon, Sheet } from './ui.jsx';
 const UI_ONLY = new Set(['1f4c5', '1f4f7', '1f3a4', '2699', '1f5d1', '2b50', '1f3b2', '1f50d', '270f', '2705', '274c', '2795', '26a0', '1f480', '1f525', '1f3e0', '23f0', '2764', '1f4a4', '1f511', '1f465', '1f50a', '1f507', '2728', '1f916', '1f6aa', '1f517', '1f4dd', '1f514', '1f4a1', '231b', '1f44d', '1f389', '1f47b', '2328', '1f319', '2600', '1f4f1', '1f4be', '1f504', '1f3ae', '1f579', '1f451', '1f4aa', '1f60b', '1f634', '1f6d2', '1f9fe', '1f37d', '1f374', '1f331', '1f332', '1f333', '1f334', '1f335', '1f337', '1f338', '1f339', '1f33a', '1f33b', '1f33c', '1f33e', '1f340', '1f341', '1f342', '1f343']);
 const catalogIcons = [...new Set(CATALOG.map((f) => f.icon))];
 const ALL_ICONS = [...catalogIcons, ...Object.keys(ICONS).filter((k) => !catalogIcons.includes(k) && !UI_ONLY.has(k))];
+
+const fmtN = (n) => String(Math.round(n * 10) / 10).replace('.', ',');
 
 const QUICK_DATES = [
   ['+3 g', 3],
@@ -19,7 +21,7 @@ const QUICK_DATES = [
 ];
 
 export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onShop, onClose }) {
-  const [d, setD] = useState({ ...item });
+  const [d, setD] = useState({ ...item, macro: macroOf(item) });
   const [picking, setPicking] = useState(false);
   const up = (patch) => setD((v) => ({ ...v, ...patch }));
   const step = stepOf(d.unit);
@@ -36,6 +38,7 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
       loc: d.loc,
       expiry: d.expiry || null,
       est: d.expiry ? !!d.est : false,
+      macro: d.macro || null,
     });
   };
 
@@ -132,6 +135,23 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
             ))}
             <button type="button" className={'chip ' + (!d.expiry ? 'on' : '')} onClick={() => up({ expiry: null, est: false })}>non scade</button>
           </div>
+        </div>
+
+        <div className="field">
+          <span>Macronutriente principale</span>
+          <div className="seg macro-seg">
+            {MACROS.map((m) => (
+              <button key={m.id} type="button" className={d.macro === m.id ? 'on' : ''} aria-pressed={d.macro === m.id} onClick={() => up({ macro: d.macro === m.id ? null : m.id })}>
+                <span className={'macro m-' + m.id}>{m.short}</span> {m.name}
+              </button>
+            ))}
+          </div>
+          {d.nutr && (
+            <p className="small muted">
+              Per 100 {d.unit === 'ml' || d.unit === 'l' ? 'ml' : 'g'}:{' '}
+              {[d.nutr.kcal != null && `${fmtN(d.nutr.kcal)} kcal`, d.nutr.p != null && `proteine ${fmtN(d.nutr.p)} g`, d.nutr.c != null && `carboidrati ${fmtN(d.nutr.c)} g`, d.nutr.f != null && `grassi ${fmtN(d.nutr.f)} g`].filter(Boolean).join(' · ')}
+            </p>
+          )}
         </div>
 
         <label className="field">

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { LOCATIONS, norm } from '../catalog.js';
+import { LOCATIONS, MACROS, macroOf, norm } from '../catalog.js';
 import { daysLeft, expiryStatus } from '../lib/dates.js';
 import { play } from '../lib/sound.js';
 import { Btn, Icon, ItemCard, Talk, useApp } from '../components/ui.jsx';
@@ -17,6 +17,7 @@ export default function Pantry() {
   const { state, warnDays, openItem, go, goneIds } = useApp();
   const [loc, setLoc] = useState('tutto');
   const [q, setQ] = useState('');
+  const [macro, setMacro] = useState('tutti');
   const items = state.items;
 
   const counts = useMemo(() => {
@@ -30,8 +31,9 @@ export default function Pantry() {
     return items
       .filter((i) => loc === 'tutto' || i.loc === loc)
       .filter((i) => !nq || norm(i.name + ' ' + (i.brand || '')).includes(nq))
+      .filter((i) => macro === 'tutti' || macroOf(i) === macro)
       .sort(byExpiry);
-  }, [items, loc, q]);
+  }, [items, loc, q, macro]);
 
   const expired = items.filter((i) => expiryStatus(i.expiry, warnDays) === 'expired').length;
   const soon = items.filter((i) => ['today', 'soon'].includes(expiryStatus(i.expiry, warnDays))).length;
@@ -77,6 +79,16 @@ export default function Pantry() {
         ))}
       </div>
 
+      {items.length > 0 && (
+        <div className="chips macro-filter" role="group" aria-label="Macronutriente">
+          <button type="button" className={'chip ' + (macro === 'tutti' ? 'on' : '')} onClick={() => setMacro('tutti')}>Tutti</button>
+          {MACROS.map((m) => (
+            <button key={m.id} type="button" className={'chip ' + (macro === m.id ? 'on' : '')} aria-pressed={macro === m.id} onClick={() => setMacro(macro === m.id ? 'tutti' : m.id)}>
+              <span className={'macro m-' + m.id}>{m.short}</span> {m.name}
+            </button>
+          ))}
+        </div>
+      )}
       {items.length > 6 && (
         <input className="input" style={{ marginTop: 10 }} type="search" placeholder="Cerca un cibo..." aria-label="Cerca un cibo" value={q} onChange={(e) => setQ(e.target.value)} />
       )}

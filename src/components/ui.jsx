@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ICONS, MASCOT } from '../icons-data.js';
 import { expiryLabel, expiryStatus, lifeRatio } from '../lib/dates.js';
 import { qtyLabel } from '../lib/items.js';
-import { BY_KEY } from '../catalog.js';
+import { BY_KEY, MACROS, macroOf } from '../catalog.js';
 import { play } from '../lib/sound.js';
 
 export const AppCtx = createContext(null);
@@ -91,6 +91,7 @@ export function ItemCard({ item, onOpen, gone }) {
         <div className="name">{item.name}</div>
         <div className="sub">
           <span className={'loc ' + item.loc}>{item.loc === 'frigo' ? 'FRIGO' : item.loc === 'freezer' ? 'FREEZER' : 'DISP.'}</span>
+          <MacroBadge item={item} />
           {qtyLabel(item)}
           {item.brand ? ' · ' + item.brand : ''}
         </div>
@@ -152,5 +153,16 @@ export function Loading({ text }) {
       <div className="dots" aria-hidden="true"><span /><span /><span /></div>
       <p className="center">{text}</p>
     </div>
+  );
+}
+
+export function MacroBadge({ item, id }) {
+  const m = id !== undefined ? id : macroOf(item);
+  const info = MACROS.find((x) => x.id === m);
+  if (!info) return null;
+  return (
+    <span className={'macro m-' + info.id} title={info.name} aria-label={info.name}>
+      {info.short}
+    </span>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { actions, cloudEnabled, friendlyError, prettyCode } from '../lib/store.js';
-import { forgetModel, GeminiError, testKey } from '../lib/gemini.js';
+import { classifyItems, forgetModel, GeminiError, testKey } from '../lib/gemini.js';
 import { play, setSound, soundOn } from '../lib/sound.js';
 import { Btn, Icon, SectionTitle, useApp } from '../components/ui.jsx';
 
@@ -13,6 +13,33 @@ export default function Settings() {
   const [sound, setSnd] = useState(soundOn());
   const [pname, setPname] = useState(pantry.name || '');
   const [sureLeave, setSureLeave] = useState(false);
+  const [classifying, setClassifying] = useState(false);
+  const missing = state.items.filter((i) => !i.nutr);
+
+  const classify = async () => {
+    setClassifying(true);
+    try {
+      let done = 0;
+      // a blocchi di 40, per non fare richieste enormi
+      for (let k = 0; k < missing.length; k += 40) {
+        const part = missing.slice(k, k + 40);
+        const res = await classifyItems(pantry.geminiKey, part.map((i) => ({ id: i.id, name: i.name, brand: i.brand })));
+        for (const i of part) {
+          const r = res[i.id];
+          if (!r) continue;
+          actions.updateItem(i.id, { macro: r.macro ?? null, ...(r.nutr ? { nutr: r.nutr } : {}) });
+          done++;
+        }
+      }
+      play('add');
+      toast(`Fatto: macronutrienti calcolati per ${done} ${done === 1 ? 'cibo' : 'cibi'}.`);
+    } catch (e) {
+      play('error');
+      toast(e instanceof GeminiError ? e.message : friendlyError(e), { err: true });
+    } finally {
+      setClassifying(false);
+    }
+  };
   const code = prettyCode(pantry.id);
   const members = Object.values(pantry.memberNames || {});
 
@@ -92,6 +119,16 @@ export default function Settings() {
           <Btn color="green" disabled={testing || key.trim() === (pantry.geminiKey || '')} onClick={() => saveKey(false)}>Salva</Btn>
           <Btn color="blue" disabled={testing || !key.trim()} onClick={() => saveKey(true)}>{testing ? 'Provo...' : 'Salva e prova'}</Btn>
         </div>
+        {pantry.geminiKey && (
+          <div className="stack" style={{ gap: 6 }}>
+            <p className="small">
+              <b>Macronutrienti.</b> I cibi aggiunti con Scrivi, Scontrino o codice a barre li hanno già. Per gli altri ({missing.length}) Gemini calcola macronutriente e valori per 100 g.
+            </p>
+            <Btn block icon="2728" disabled={classifying || !missing.length} onClick={classify}>
+              {classifying ? 'Calcolo...' : missing.length ? `Calcola per ${missing.length} ${missing.length === 1 ? 'cibo' : 'cibi'}` : 'Tutti i cibi hanno i valori'}
+            </Btn>
+          </div>
+        )}
       </div>
 
       <SectionTitle icon="23f0">Avvisi</SectionTitle>

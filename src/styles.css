@@ -514,3 +514,14 @@ html, body { overflow-x: hidden; }
 }
 
 .qty-head .name-edit { font-weight: 700; font-size: 19px; min-height: 40px; padding: 6px 8px; }
+
+/* ---------- macronutrienti ---------- */
+.macro { display: inline-grid; place-items: center; width: 16px; height: 16px; font-family: var(--font-title); font-size: 8px; padding-top: 1px; margin-right: 6px; vertical-align: 1px; box-shadow: 0 0 0 2px var(--ink); color: var(--ink); }
+.macro.m-proteine { background: #ff8a7a; }
+.macro.m-carboidrati { background: var(--yellow); }
+.macro.m-grassi { background: #f6a85a; }
+.macro.m-fibre { background: #8fd477; }
+.macro-filter { margin-top: 10px; }
+.macro-filter .chip { display: inline-flex; align-items: center; }
+.macro-seg button { font-size: 14px; flex-direction: column; gap: 4px; padding: 7px 2px; }
+.macro-seg .macro { margin: 0; }

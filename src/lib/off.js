@@ -3,7 +3,7 @@ import { matchFood } from '../catalog.js';
 import { makeDraft } from './items.js';
 import { codeVariants } from './barcode.js';
 
-const FIELDS = 'product_name,product_name_it,product_name_en,generic_name_it,generic_name,brands,quantity,product_quantity,product_quantity_unit,categories_tags';
+const FIELDS = 'product_name,product_name_it,product_name_en,generic_name_it,generic_name,brands,quantity,product_quantity,product_quantity_unit,categories_tags,nutriments';
 
 async function fetchProduct(code) {
   const url = `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=${FIELDS}`;
@@ -38,7 +38,9 @@ export async function lookupBarcode(code) {
     if (unit === 'g' && qty >= 1000) [qty, unit] = [qty / 1000, 'kg'];
     if (unit === 'ml' && qty >= 1000) [qty, unit] = [qty / 1000, 'l'];
   }
-  return makeDraft({ name, brand, qty, unit, foodKey: food?.key });
+  const n = p.nutriments || {};
+  const nutr = { kcal: n['energy-kcal_100g'], p: n.proteins_100g, c: n.carbohydrates_100g, f: n.fat_100g };
+  return makeDraft({ name, brand, qty, unit, foodKey: food?.key, nutr });
 }
 
 // Le categorie di Open Food Facts sono spesso in inglese: piccola tabella di traduzione

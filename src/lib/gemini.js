@@ -2,7 +2,7 @@
 // La chiave la inserisci tu nelle Opzioni dell'app: non è mai scritta nel codice.
 import { CATALOG } from '../catalog.js';
 import { todayISO } from './dates.js';
-import { makeDraft } from './items.js';
+import { cleanNutr, makeDraft } from './items.js';
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const DEFAULT_MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
@@ -72,6 +72,11 @@ const SCHEMA = {
           posto: { type: 'STRING', enum: ['frigo', 'freezer', 'dispensa'] },
           scadenza: { type: 'STRING' },
           scadenza_stimata: { type: 'BOOLEAN' },
+          macro: { type: 'STRING', enum: ['proteine', 'carboidrati', 'grassi', 'fibre', 'nessuno'] },
+          kcal_100: { type: 'NUMBER' },
+          proteine_100: { type: 'NUMBER' },
+          carboidrati_100: { type: 'NUMBER' },
+          grassi_100: { type: 'NUMBER' },
         },
         required: ['nome', 'quantita', 'unita', 'tipo', 'posto', 'scadenza', 'scadenza_stimata'],
       },
@@ -151,7 +156,9 @@ Regole per ogni alimento:
 - "posto": dove si conserva di solito: frigo, freezer o dispensa.
 - "scadenza": data AAAA-MM-GG. Se l'utente la dice o è leggibile, usa quella e metti "scadenza_stimata": false. Se non c'è, stima una data realistica partendo da oggi per quel prodotto conservato in quel posto e metti "scadenza_stimata": true. Se il prodotto non scade in pratica (sale, zucchero), usa "".
 - Ignora tutto ciò che non si mangia o non si beve (detersivi, sacchetti, sconti, totali, punti fedeltà).
-- Se lo stesso prodotto compare più volte, unisci le righe sommando la quantità.`;
+- Se lo stesso prodotto compare più volte, unisci le righe sommando la quantità.
+- "macro": il macronutriente principale (proteine, carboidrati, grassi, fibre per verdure e simili poco caloriche; nessuno per acqua, sale, spezie, caffè, alcolici).
+- "kcal_100", "proteine_100", "carboidrati_100", "grassi_100": valori tipici per 100 g (o 100 ml) di quel prodotto, arrotondati.`;
 
 function toDrafts(json) {
   const list = Array.isArray(json) ? json : json.items || [];
@@ -167,6 +174,8 @@ function toDrafts(json) {
         loc: x.posto,
         expiry: x.scadenza,
         est: x.scadenza_stimata,
+        macro: x.macro,
+        nutr: { kcal: x.kcal_100, p: x.proteine_100, c: x.carboidrati_100, f: x.grassi_100 },
       })
     );
 }
@@ -235,12 +244,50 @@ export async function readBarcodeDigits(key, base64, mime) {
 // Prodotto non presente in Open Food Facts: Gemini cerca il codice su Google
 export async function lookupBarcodeOnline(key, code) {
   const prompt = `Cerca su internet il prodotto con codice a barre ${code} (EAN/UPC; può essere un prodotto italiano, europeo o statunitense).
-Rispondi SOLO con JSON, senza altro testo: {"trovato": true/false, "nome": "...", "marca": "...", "quantita": numero, "unita": "pz|conf|g|kg|ml|l", "tipo": "..."}
+Rispondi SOLO con JSON, senza altro testo: {"trovato": true/false, "nome": "...", "marca": "...", "quantita": numero, "unita": "pz|conf|g|kg|ml|l", "tipo": "...", "macro": "proteine|carboidrati|grassi|fibre|nessuno", "kcal_100": n, "proteine_100": n, "carboidrati_100": n, "grassi_100": n}
 - Metti "trovato": true SOLO se le fonti indicano proprio questo codice. Non indovinare: se non sei sicuro, "trovato": false.
 - "nome": nome breve in italiano del prodotto (traducilo se è in inglese, es. "Peanut Butter" diventa "Burro di arachidi"), senza marca e senza quantità.
 - Converti once e libbre: "quantita" in g (1 oz = 28 g, 1 lb = 454 g) o in ml (1 fl oz = 30 ml).
 - "tipo": la chiave più adatta presa ESATTAMENTE da questo elenco, oppure "altro": ${TIPI}.`;
   const json = parseJSON(await generate(key, [{ text: prompt }], SCHEMA, true));
   if (!json || !json.trovato || !json.nome) return null;
-  return makeDraft({ name: json.nome, brand: json.marca, qty: json.quantita, unit: json.unita, foodKey: json.tipo });
+  return makeDraft({ name: json.nome, brand: json.marca, qty: json.quantita, unit: json.unita, foodKey: json.tipo, macro: json.macro, nutr: { kcal: json.kcal_100, p: json.proteine_100, c: json.carboidrati_100, f: json.grassi_100 } });
+}
+
+// Classifica in un colpo solo i cibi già in dispensa: macronutriente e valori per 100 g
+export async function classifyItems(key, items) {
+  const schema = {
+    type: 'OBJECT',
+    properties: {
+      items: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            id: { type: 'STRING' },
+            macro: { type: 'STRING', enum: ['proteine', 'carboidrati', 'grassi', 'fibre', 'nessuno'] },
+            kcal_100: { type: 'NUMBER' },
+            proteine_100: { type: 'NUMBER' },
+            carboidrati_100: { type: 'NUMBER' },
+            grassi_100: { type: 'NUMBER' },
+          },
+          required: ['id', 'macro'],
+        },
+      },
+    },
+    required: ['items'],
+  };
+  const list = items.map((i) => `${i.id} | ${i.name}${i.brand ? ' (' + i.brand + ')' : ''}`).join('\n');
+  const prompt = `Per ogni alimento dell'elenco (formato "id | nome"), indica il macronutriente principale e i valori nutrizionali tipici per 100 g (o 100 ml).
+"macro": proteine, carboidrati, grassi, fibre (verdure e simili poco caloriche) oppure nessuno (acqua, sale, spezie, caffè, tè, alcolici).
+Rispondi SOLO con JSON {"items":[{"id","macro","kcal_100","proteine_100","carboidrati_100","grassi_100"}]} usando gli stessi id.
+
+${list}`;
+  const json = parseJSON(await generate(key, [{ text: prompt }], schema));
+  const out = {};
+  for (const x of json.items || []) {
+    if (!x || !x.id) continue;
+    out[x.id] = { macro: x.macro === 'nessuno' ? null : x.macro, nutr: cleanNutr({ kcal: x.kcal_100, p: x.proteine_100, c: x.carboidrati_100, f: x.grassi_100 }) };
+  }
+  return out;
 }
