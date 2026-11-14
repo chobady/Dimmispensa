@@ -1,8 +1,14 @@
-// Valori nutrizionali: PRIMA l'etichetta (Open Food Facts), e SOLO se manca Gemini.
+// Valori nutrizionali: 1) etichetta (Open Food Facts; USDA solo per prodotti USA), 2) tabella ufficiale Ciqual per i cibi generici, 3) SOLO se manca tutto, Gemini.
 import { classifyItems } from './gemini.js';
-import { macroFromNutr } from './items.js';
+import { macroFromNutr, tableNutr } from './items.js';
 import { labelByCode, labelByName } from './off.js';
 import { usdaByCode, usdaByName } from './usda.js';
+
+// Codici a barre di USA e Canada (GS1 000-139, oppure UPC a 12 cifre): solo per questi ha senso chiedere a USDA
+export const isNorthAmerican = (code) => {
+  const c = String(code || '').replace(/\D/g, '');
+  return c.length === 12 || c.length === 8 && /^[01]/.test(c) || (c.length === 13 && /^[01]/.test(c));
+};
 
 // L'etichetta è "completa" se ha proteine, carboidrati e grassi
 export const nutrComplete = (n) => !!n && n.p !== null && n.c !== null && n.f !== null;
@@ -28,11 +34,13 @@ function merge(label, gem) {
  */
 export async function fillNutrition(list, geminiKey, { byCode = true, byName = true, maxName = 12, onStep, usdaKey = '', code: forcedCode } = {}) {
   const out = list.map((x) => ({ ...x }));
-  const stats = { etichetta: 0, gemini: 0 };
+  const stats = { etichetta: 0, tabella: 0, gemini: 0 };
   let nameSearches = 0; // Open Food Facts limita le ricerche per nome: ne faccio al massimo maxName
   for (let i = 0; i < out.length; i++) {
     const x = out[i];
     if (x.nutrSrc === 'etichetta' && nutrComplete(x.nutr)) continue;
+    // cibi sfusi già con i valori della tabella e senza codice/marca: non c'è un'etichetta da cercare
+    if (x.nutrSrc === 'tabella' && !x.code && !x.brand && !forcedCode) continue;
     let label = x.nutrSrc === 'etichetta' ? x.nutr : null;
     try {
       const code = x.code || forcedCode;
@@ -41,7 +49,7 @@ export async function fillNutrition(list, geminiKey, { byCode = true, byName = t
         onStep && onStep(`Leggo l'etichetta di ${x.name}...`);
         label = (await labelByCode(code).catch(() => null)) || label;
       }
-      if (!nutrComplete(label) && code) {
+      if (!nutrComplete(label) && code && isNorthAmerican(code)) {
         onStep && onStep(`Cerco ${x.name} nella banca dati USDA...`);
         label = (await usdaByCode(usdaKey, code).catch(() => null)) || label;
       }
@@ -50,18 +58,22 @@ export async function fillNutrition(list, geminiKey, { byCode = true, byName = t
         nameSearches++;
         onStep && onStep(`Cerco l'etichetta di ${x.name}...`);
         label = (await labelByName(x.name, x.brand).catch(() => null)) || label;
-        if (!nutrComplete(label)) label = (await usdaByName(usdaKey, x.name, x.brand).catch(() => null)) || label;
+        if (!nutrComplete(label) && code && isNorthAmerican(code)) label = (await usdaByName(usdaKey, x.name, x.brand).catch(() => null)) || label;
       }
     } catch {}
     if (nutrComplete(label)) {
       out[i] = withNutr(x, label, 'etichetta');
       stats.etichetta++;
+    } else if (tableNutr(x.food) && x.nutrSrc !== 'tabella') {
+      // niente etichetta: valori medi della tabella ufficiale, meglio di una stima
+      out[i] = withNutr(x, tableNutr(x.food), 'tabella');
+      stats.tabella++;
     } else if (label) {
       out[i] = { ...x, _partial: label };
     }
   }
   // Gemini SOLO per chi non ha un'etichetta completa e non ha già una stima di Gemini
-  const need = out.filter((x) => !(x.nutrSrc === 'etichetta' && nutrComplete(x.nutr)) && !(x.nutrSrc === 'gemini' && x.nutr));
+  const need = out.filter((x) => !(x.nutrSrc === 'etichetta' && nutrComplete(x.nutr)) && !(x.nutrSrc === 'tabella' && x.nutr) && !(x.nutrSrc === 'gemini' && x.nutr));
   if (need.length && geminiKey) {
     onStep && onStep('Chiedo a Gemini i valori che mancano...');
     for (let k = 0; k < need.length; k += 40) {

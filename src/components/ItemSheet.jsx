@@ -5,6 +5,7 @@ import { addDays, expiryLabel } from '../lib/dates.js';
 import { stepOf } from '../lib/items.js';
 import { Btn, Icon, Sheet, useApp } from './ui.jsx';
 import MacroPanel from './MacroPie.jsx';
+import { CIQUAL } from '../ciqual-data.js';
 import { sumMacros } from '../lib/macros.js';
 import { fillNutrition } from '../lib/nutrition.js';
 import { actions } from '../lib/store.js';
@@ -169,7 +170,7 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
             <div className="win flat" style={{ marginTop: 8 }}>
               <MacroPanel totals={sumMacros([{ name: d.name, nutr: d.nutr, grams: 100 }])} perLabel={`per 100 ${d.unit === 'ml' || d.unit === 'l' ? 'ml' : 'g'}`} />
               <p className="small muted" style={{ marginTop: 6 }}>
-                {d.nutrSrc === 'etichetta' ? 'Dati dell’etichetta (Open Food Facts o USDA).' : d.nutrSrc === 'misto' ? 'Etichetta, completata da Gemini dove mancava.' : d.nutrSrc === 'gemini' ? 'Stima di Gemini: valori tipici, non della tua confezione.' : ''}
+                {d.nutrSrc === 'tabella' ? `Valori medi dalla tabella ufficiale Ciqual (ANSES): ${CIQUAL[d.food]?.n || 'alimento generico'}.` : d.nutrSrc === 'etichetta' ? 'Dati dell’etichetta (Open Food Facts o USDA).' : d.nutrSrc === 'misto' ? 'Etichetta, completata da Gemini dove mancava.' : d.nutrSrc === 'gemini' ? 'Stima di Gemini: valori tipici, non della tua confezione.' : ''}
               </p>
             </div>
           ) : (

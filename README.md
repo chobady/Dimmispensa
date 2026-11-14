@@ -43,5 +43,6 @@ npm run icons    # rigenera src/icons-data.js dopo aver cambiato le icone
 - 210 vengono dalle emoji di [SerenityOS](https://github.com/SerenityOS/serenity) (licenza BSD 2-Clause, testo in `assets/serenity-emoji/LICENSE`);
 - 62 sono disegnate apposta per Dimmispensa (yogurt, mozzarella, tonno, passata, zucchine...) e stanno in `tools/custom-icons.txt`.
 
-I dati dei codici a barre arrivano da [Open Food Facts](https://world.openfoodfacts.org) (licenza ODbL).
+I dati dei codici a barre arrivano da [Open Food Facts](https://world.openfoodfacts.org) (licenza ODbL) e, per i prodotti americani, da [USDA FoodData Central](https://fdc.nal.usda.gov) (pubblico dominio).
+I valori medi dei cibi sfusi vengono dalla tabella [Ciqual 2025](https://ciqual.anses.fr/) di ANSES (Licence Ouverte): "Anses. 2025. Ciqual French food composition table."
 I font sono Press Start 2P e Pixelify Sans (licenza OFL).

@@ -64,12 +64,18 @@ export async function labelByName(name, brand) {
   const b = norm(brand);
   if (!b || b.length < 2) return null;
   const terms = `${brand} ${name}`.trim();
-  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(terms)}&search_simple=1&action=process&json=1&page_size=5&fields=product_name,product_name_it,product_name_en,brands,nutriments`;
-  const r = await fetch(url);
-  if (!r.ok) return null;
-  const data = await r.json().catch(() => ({}));
+  const base = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(terms)}&search_simple=1&action=process&json=1&page_size=8&fields=product_name,product_name_it,product_name_en,brands,nutriments`;
+  // prima i prodotti venduti in Italia, poi tutto il mondo
+  let products = [];
+  for (const url of [base + '&lc=it&tagtype_0=countries&tag_contains_0=contains&tag_0=italy', base]) {
+    const r = await fetch(url).catch(() => null);
+    if (!r || !r.ok) continue;
+    const data = await r.json().catch(() => ({}));
+    products = data.products || [];
+    if (products.length) break;
+  }
   const words = norm(name).split(' ').filter((w) => w.length > 3);
-  for (const p of data.products || []) {
+  for (const p of products) {
     const pb = norm(p.brands);
     const pn = norm(`${p.product_name_it || ''} ${p.product_name || ''} ${p.product_name_en || ''}`);
     const brandOk = pb && (pb.includes(b) || b.includes(pb.split(' ')[0]));

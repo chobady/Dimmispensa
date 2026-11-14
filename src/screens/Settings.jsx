@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { actions, cloudEnabled, friendlyError, prettyCode } from '../lib/store.js';
 import { forgetModel, GeminiError, testKey } from '../lib/gemini.js';
 import { fillNutrition } from '../lib/nutrition.js';
+import { CIQUAL } from '../ciqual-data.js';
 import { play, setSound, soundOn } from '../lib/sound.js';
 import { Btn, Icon, SectionTitle, useApp } from '../components/ui.jsx';
 
@@ -16,7 +17,7 @@ export default function Settings() {
   const [sureLeave, setSureLeave] = useState(false);
   const [classifying, setClassifying] = useState(false);
   // senza valori, oppure con una stima di Gemini ma con codice/marca per cercare l'etichetta vera
-  const missing = state.items.filter((i) => !i.nutr || (i.nutrSrc !== 'etichetta' && (i.code || i.brand) && !i.labelTried));
+  const missing = state.items.filter((i) => !i.nutr || (i.nutrSrc !== 'etichetta' && i.nutrSrc !== 'tabella' && CIQUAL[i.food]) || (i.nutrSrc !== 'etichetta' && (i.code || i.brand) && !i.labelTried));
   const [step, setStep] = useState('');
   const [usda, setUsda] = useState(pantry.usdaKey || '');
 
@@ -32,7 +33,7 @@ export default function Settings() {
         actions.updateItem(x.id, patch);
       });
       play('add');
-      toast(`Fatto: ${stats.etichetta} dall'etichetta, ${stats.gemini} stimati da Gemini.`);
+      toast(`Fatto: ${stats.etichetta} dall'etichetta, ${stats.tabella} dalla tabella ufficiale, ${stats.gemini} stimati da Gemini.`);
     } catch (e) {
       play('error');
       toast(e instanceof GeminiError ? e.message : friendlyError(e), { err: true });
@@ -124,7 +125,7 @@ export default function Settings() {
         {pantry.geminiKey && (
           <div className="stack" style={{ gap: 6 }}>
             <p className="small">
-              <b>Valori nutrizionali.</b> Prima cerco l'etichetta vera (codice a barre o marca, su Open Food Facts e USDA); solo se non c'è chiedo una stima a Gemini. Da controllare: {missing.length}.
+              <b>Valori nutrizionali.</b> Prima l'etichetta vera (Open Food Facts, dando la precedenza ai prodotti venduti in Italia; USDA solo per i prodotti americani), poi i valori medi della tabella ufficiale Ciqual per i cibi sfusi; solo se manca tutto chiedo una stima a Gemini. Da controllare: {missing.length}.
             </p>
             <Btn block icon="2728" disabled={classifying || !missing.length} onClick={classify}>
               {classifying ? step || 'Cerco...' : missing.length ? `Completa i valori di ${missing.length} ${missing.length === 1 ? 'cibo' : 'cibi'}` : 'Tutti i cibi hanno i valori'}
@@ -136,7 +137,7 @@ export default function Settings() {
       <SectionTitle icon="1f50d">Etichette (USDA)</SectionTitle>
       <div className="win stack">
         <p className="small">
-          Dopo Open Food Facts cerco le etichette anche nella banca dati ufficiale americana USDA (ottima per i prodotti USA). Funziona già senza chiave, ma con poche ricerche l'ora: con una chiave gratuita arrivi a 1000 l'ora. Creala su{' '}
+          Solo per i prodotti americani (codici a barre USA/Canada) cerco anche nella banca dati ufficiale USDA. Funziona già senza chiave, ma con poche ricerche l'ora: con una chiave gratuita arrivi a 1000 l'ora. Creala su{' '}
           <a href="https://fdc.nal.usda.gov/api-key-signup" target="_blank" rel="noreferrer">fdc.nal.usda.gov/api-key-signup</a> (ti arriva per email) e incollala qui.
         </p>
         <div className="row">

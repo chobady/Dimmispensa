@@ -1,5 +1,12 @@
 import { BY_KEY, OTHER, matchFood, UNITS } from '../catalog.js';
 import { addDays, isISO } from './dates.js';
+import { CIQUAL } from '../ciqual-data.js';
+
+// Valori dalla tabella ufficiale per un cibo del catalogo (o null)
+export const tableNutr = (foodKey) => {
+  const t = CIQUAL[foodKey];
+  return t ? { kcal: t.kcal, p: t.p, c: t.c, f: t.f } : null;
+};
 
 export const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
@@ -27,6 +34,12 @@ export function macroFromNutr(n) {
 export function makeDraft({ name, brand = '', qty, unit, foodKey, loc, expiry, est, macro, nutr, nutrSrc, code }) {
   const food = BY_KEY[foodKey] || matchFood(name) || matchFood(brand) || OTHER;
   const hasDate = isISO(expiry);
+  // ordine dei valori: etichetta > tabella ufficiale (Ciqual) > stima di Gemini
+  if (!(nutrSrc === 'etichetta' && cleanNutr(nutr)) && tableNutr(food.key)) {
+    nutr = tableNutr(food.key);
+    nutrSrc = 'tabella';
+    macro = undefined;
+  }
   return {
     id: newId(),
     name: cap(String(name || food.name).trim()).slice(0, 60),

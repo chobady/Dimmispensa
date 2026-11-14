@@ -7,7 +7,7 @@ import QtyPicker, { unitFamily } from '../components/QtyPicker.jsx';
 import { parseLocal } from '../lib/parse.js';
 import { fileToJpegBase64, itemsFromReceipt, itemsFromText, lookupBarcodeOnline, readBarcodeDigits } from '../lib/gemini.js';
 import { decodeImageFile, getDecoder, crop, validCode } from '../lib/barcode.js';
-import { fillNutrition, nutrComplete } from '../lib/nutrition.js';
+import { fillNutrition, isNorthAmerican, nutrComplete } from '../lib/nutrition.js';
 import { usdaProductByCode } from '../lib/usda.js';
 import { lookupBarcode } from '../lib/off.js';
 import { play } from '../lib/sound.js';
@@ -364,8 +364,8 @@ function Barcode({ onDrafts }) {
     try {
       let draft = await lookupBarcode(code);
       let online = false;
-      if (!draft) {
-        // non è in Open Food Facts: provo la banca dati USDA (molti prodotti americani)
+      if (!draft && isNorthAmerican(code)) {
+        // prodotto americano non in Open Food Facts: provo la banca dati USDA
         setStatus(`${code} non è in Open Food Facts, provo USDA...`);
         const u = await usdaProductByCode(state.pantry?.usdaKey, code).catch(() => null);
         if (u && u.name) draft = makeDraft({ name: u.name, brand: u.brand, qty: u.qty, unit: u.unit, foodKey: (matchFood(u.name) || {}).key, nutr: u.nutr, nutrSrc: 'etichetta', code });
