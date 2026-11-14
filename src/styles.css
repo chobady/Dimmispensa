@@ -512,3 +512,5 @@ html, body { overflow-x: hidden; }
   .nav .desk-only { display: flex !important; }
   .shop-wrap { max-width: 760px; }
 }
+
+.qty-head .name-edit { font-weight: 700; font-size: 19px; min-height: 40px; padding: 6px 8px; }

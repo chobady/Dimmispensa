@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CATALOG, CATEGORIES, LOCATIONS, PRESETS, norm } from '../catalog.js';
 import { actions } from '../lib/store.js';
 import { defaultQty, draftFromFood, makeDraft, qtyLabel } from '../lib/items.js';
-import { expiryLabel } from '../lib/dates.js';
+import { addDays, expiryLabel } from '../lib/dates.js';
 import QtyPicker, { unitFamily } from '../components/QtyPicker.jsx';
 import { parseLocal } from '../lib/parse.js';
 import { fileToJpegBase64, itemsFromReceipt, itemsFromText, lookupBarcodeOnline, readBarcodeDigits } from '../lib/gemini.js';
@@ -336,6 +336,7 @@ function Barcode({ onDrafts }) {
   const [unknown, setUnknown] = useState(null); // codice non trovato
   const [unknownName, setUnknownName] = useState('');
   const [reading, setReading] = useState(false);
+  const [preview, setPreview] = useState(null); // { draft, note } in attesa di conferma
 
   const stop = () => {
     clearTimeout(loopRef.current);
@@ -349,7 +350,7 @@ function Barcode({ onDrafts }) {
 
   const handle = async (code) => {
     const now = Date.now();
-    if (busyRef.current || (code === lastRef.current.code && now - lastRef.current.t < 4000)) return;
+    if (busyRef.current || (code === lastRef.current.code && now - lastRef.current.t < 8000)) return;
     lastRef.current = { code, t: now };
     busyRef.current = true;
     if (navigator.vibrate) navigator.vibrate(60);
@@ -364,10 +365,12 @@ function Barcode({ onDrafts }) {
         online = !!draft;
       }
       if (draft) {
-        play('add');
-        onDrafts([draft]);
+        play('open');
         setUnknown(null);
-        setStatus(`Trovato${online ? ' su internet' : ''}: ${draft.name}${draft.brand ? ' (' + draft.brand + ')' : ''}.${online ? ' Controlla che sia giusto.' : ''} Inquadra il prossimo!`);
+        setStatus('');
+        // la fotocamera resta in pausa finché non confermi (busyRef resta true)
+        setPreview({ draft, note: online ? 'trovato su internet: controlla che sia giusto' : '' });
+        return;
       } else {
         play('error');
         setStatus('');
@@ -378,9 +381,19 @@ function Barcode({ onDrafts }) {
       play('error');
       setStatus('');
       toast(e.message || 'Ricerca non riuscita. Controlla la connessione.', { err: true });
-    } finally {
-      busyRef.current = false;
     }
+    busyRef.current = false;
+  };
+
+  const closePreview = (added) => {
+    if (added) {
+      play('add');
+      onDrafts([added]);
+      setStatus(`${added.name}: in lista. ${streamRef.current ? 'Inquadra il prossimo!' : ''}`);
+    }
+    setPreview(null);
+    lastRef.current = { code: lastRef.current.code, t: Date.now() }; // non rileggere subito lo stesso codice
+    busyRef.current = false;
   };
 
   const start = async () => {
@@ -491,9 +504,9 @@ function Barcode({ onDrafts }) {
   const addUnknown = (e) => {
     e.preventDefault();
     if (!unknownName.trim()) return;
-    play('add');
-    onDrafts([makeDraft({ name: unknownName.trim() })]);
-    setStatus(`Aggiunto: ${unknownName.trim()}.`);
+    play('open');
+    busyRef.current = true;
+    setPreview({ draft: makeDraft({ name: unknownName.trim() }), note: '' });
     setUnknown(null);
   };
 
@@ -501,6 +514,17 @@ function Barcode({ onDrafts }) {
 
   return (
     <div className="stack">
+      {preview && (
+        <QtySheet
+          key={preview.draft.id}
+          ask={{ draft: preview.draft }}
+          title="Trovato!"
+          note={preview.note}
+          addLabel="Metti in lista"
+          onClose={() => closePreview(null)}
+          onAdd={(d) => closePreview(d)}
+        />
+      )}
       {on ? (
         <>
           <div className="scanner">
@@ -557,7 +581,16 @@ function Barcode({ onDrafts }) {
 }
 
 // ------------------------------------------------------------------ quanto ne hai comprato?
-function QtySheet({ ask, onClose, onAdd }) {
+const QUICK_DATES = [
+  ['+3 g', 3],
+  ['+1 sett', 7],
+  ['+2 sett', 14],
+  ['+1 mese', 30],
+  ['+3 mesi', 90],
+  ['+1 anno', 365],
+];
+
+function QtySheet({ ask, onClose, onAdd, title = 'Quanto ne hai?', note, addLabel = 'Aggiungi' }) {
   const [d, setD] = useState(ask.draft);
   const qtyNum = Number(String(d.qty).replace(',', '.')) || 0;
   const change = ({ qty, unit, unitChanged }) => setD((v) => ({ ...v, unit, qty: unitChanged ? defaultQty(unit) : qty }));
@@ -566,17 +599,32 @@ function QtySheet({ ask, onClose, onAdd }) {
     const fresh = makeDraft({ name: d.name, foodKey: d.food, loc, qty: d.qty, unit: d.unit });
     setD((v) => ({ ...v, loc, expiry: v.est ? fresh.expiry : v.expiry }));
   };
+  const setExpiry = (expiry) => setD((v) => ({ ...v, expiry, est: false }));
   return (
-    <Sheet title="Quanto ne hai?" onClose={onClose}>
+    <Sheet title={title} onClose={onClose}>
       <form className="stack" onSubmit={(e) => (e.preventDefault(), qtyNum > 0 && onAdd({ ...d, qty: qtyNum }))}>
         <div className="qty-head">
           <Icon id={d.icon} size={50} />
-          <div>
-            <p className="nm">{d.name}</p>
-            <p className="small muted">{d.expiry ? `${expiryLabel(d.expiry, d.est)}${d.est ? ' (stimata)' : ''}` : 'non scade'}</p>
+          <div className="grow">
+            <input className="input name-edit" value={d.name} onChange={(e) => setD((v) => ({ ...v, name: e.target.value }))} aria-label="Nome" maxLength={60} />
+            {(d.brand || note) && <p className="small muted">{[d.brand, note].filter(Boolean).join(' · ')}</p>}
           </div>
         </div>
+
+        <h3 className="label">Quantità</h3>
         <QtyPicker qty={d.qty} unit={d.unit} units={unitFamily(d.unit)} presets={PRESETS[d.unit] || PRESETS.pz} onChange={change} />
+
+        <h3 className="label">
+          Scadenza{d.expiry ? `: ${expiryLabel(d.expiry, d.est)}${d.est ? ' (stimata da me)' : ''}` : ': non scade'}
+        </h3>
+        <input className="input" type="date" value={d.expiry || ''} onChange={(e) => setExpiry(e.target.value || null)} aria-label="Data di scadenza" />
+        <div className="chips">
+          {QUICK_DATES.map(([label, n]) => (
+            <button key={label} type="button" className="chip" onClick={() => setExpiry(addDays(n))}>{label}</button>
+          ))}
+          <button type="button" className={'chip ' + (!d.expiry ? 'on' : '')} onClick={() => setExpiry(null)}>non scade</button>
+        </div>
+
         <div className="seg">
           {LOCATIONS.map((l) => (
             <button key={l.id} type="button" className={d.loc === l.id ? 'on' : ''} aria-pressed={d.loc === l.id} onClick={() => setLoc(l.id)}>
@@ -584,8 +632,8 @@ function QtySheet({ ask, onClose, onAdd }) {
             </button>
           ))}
         </div>
-        <Btn type="submit" color="green" block icon="2795" sound={null} disabled={!(qtyNum > 0)}>
-          Aggiungi {qtyNum > 0 ? qtyLabel({ qty: qtyNum, unit: d.unit }) : ''}
+        <Btn type="submit" color="green" block icon="2795" sound={null} disabled={!(qtyNum > 0) || !d.name.trim()}>
+          {addLabel} {qtyNum > 0 ? qtyLabel({ qty: qtyNum, unit: d.unit }) : ''}
         </Btn>
       </form>
     </Sheet>
