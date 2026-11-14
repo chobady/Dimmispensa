@@ -10,6 +10,19 @@ export const addDays = (n, from = new Date()) => {
   const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + n);
   return toISO(d);
 };
+// "AAAA-MM-GG" + n mesi (il 31 gennaio + 1 mese diventa il 28/29 febbraio)
+export const addMonths = (iso, n) => {
+  const d = fromISO(iso);
+  const last = new Date(d.getFullYear(), d.getMonth() + n + 1, 0).getDate();
+  return toISO(new Date(d.getFullYear(), d.getMonth() + n, Math.min(d.getDate(), last)));
+};
+// si può congelare: non è già in freezer e scade oggi, domani o dopodomani
+export const canFreeze = (item) => {
+  if (!item || item.loc === 'freezer' || !item.expiry) return false;
+  const n = daysLeft(item.expiry);
+  return n !== null && n >= 0 && n <= 2;
+};
+export const FREEZE_MONTHS = 2;
 export const isISO = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(fromISO(s));
 
 export function daysLeft(expiry) {

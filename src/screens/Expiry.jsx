@@ -1,4 +1,4 @@
-import { daysLeft } from '../lib/dates.js';
+import { canFreeze, daysLeft } from '../lib/dates.js';
 import { Btn, Icon, ItemCard, SectionTitle, Talk, useApp } from '../components/ui.jsx';
 import { byExpiry } from './Pantry.jsx';
 
@@ -11,7 +11,7 @@ const GROUPS = [
 ];
 
 export default function Expiry() {
-  const { state, openItem, go, goneIds } = useApp();
+  const { state, openItem, go, goneIds, freezeItem } = useApp();
   const dated = state.items.filter((i) => i.expiry).sort(byExpiry);
   const groups = GROUPS.map((g) => ({ ...g, items: dated.filter((i) => g.test(daysLeft(i.expiry))) })).filter((g) => g.items.length);
   const urgent = dated.filter((i) => daysLeft(i.expiry) <= 1).length;
@@ -39,7 +39,16 @@ export default function Expiry() {
           <SectionTitle icon={g.icon}>{g.title}</SectionTitle>
           <div className="list">
             {g.items.map((it) => (
-              <ItemCard key={it.id} item={it} onOpen={openItem} gone={goneIds.has(it.id)} />
+              canFreeze(it) ? (
+                <div key={it.id} className="freeze-wrap">
+                  <ItemCard item={it} onOpen={openItem} gone={goneIds.has(it.id)} />
+                  <button type="button" className="freeze-btn" onClick={() => freezeItem(it)} aria-label={`Congela ${it.name}: dura altri 2 mesi`}>
+                    <Icon id="2744" size={18} /> Congela (+2 mesi)
+                  </button>
+                </div>
+              ) : (
+                <ItemCard key={it.id} item={it} onOpen={openItem} gone={goneIds.has(it.id)} />
+              )
             ))}
           </div>
         </section>

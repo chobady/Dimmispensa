@@ -592,3 +592,9 @@ body.no-scroll { overflow: hidden; }
 .offer-row .price s { font-size: 13px; color: var(--ink-soft); }
 .offer-add { border: 0; width: 34px; height: 34px; flex: none; background: var(--yellow); font-family: var(--font-title); font-size: 13px; box-shadow: 0 0 0 3px var(--ink), inset -3px -3px 0 var(--yellow-d); }
 .offer-add:disabled { background: var(--paper-2); box-shadow: 0 0 0 3px var(--ink-soft); }
+
+/* ---------- congela ---------- */
+.freeze-box { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #dff1fb; box-shadow: 0 0 0 3px var(--ink); }
+.freeze-wrap { display: flex; flex-direction: column; }
+.freeze-btn { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 3px; padding: 8px 10px; border: 0; background: #8fd0f4; font-family: var(--font-title); font-size: 10px; color: var(--ink); box-shadow: 0 3px 0 var(--ink), -3px 0 0 var(--ink), 3px 0 0 var(--ink); cursor: pointer; }
+.freeze-btn:active { transform: translateY(2px); }

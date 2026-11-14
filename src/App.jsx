@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { actions, getState, subscribe } from './lib/store.js';
-import { expiryStatus } from './lib/dates.js';
+import { FREEZE_MONTHS, addMonths, canFreeze, expiryStatus, shortDate, todayISO } from './lib/dates.js';
 import { play } from './lib/sound.js';
 import { AppCtx, Icon, Loading } from './components/ui.jsx';
 import ItemSheet from './components/ItemSheet.jsx';
@@ -93,6 +93,16 @@ export default function App() {
     toast(text, { action: { label: 'Annulla', fn: () => actions.addItems([item]) } });
   };
 
+  // Congela: va in freezer e la scadenza si sposta di 2 mesi
+  const freezeItem = (item) => {
+    setOpenId(null);
+    const before = { loc: item.loc, expiry: item.expiry, est: !!item.est };
+    const expiry = addMonths(item.expiry || todayISO(), FREEZE_MONTHS);
+    actions.updateItem(item.id, { loc: 'freezer', expiry, est: false, frozenAt: Date.now() });
+    play('add');
+    toast(`${item.name}: in freezer, ora scade il ${shortDate(expiry)}.`, { action: { label: 'Annulla', fn: () => actions.updateItem(item.id, { ...before, frozenAt: null }) } });
+  };
+
   const ctx = useMemo(
     () => ({
       state,
@@ -101,6 +111,7 @@ export default function App() {
       toast,
       go,
       goneIds,
+      freezeItem,
       openItem: (item) => {
         play('open');
         setOpenId(item.id);
@@ -192,6 +203,7 @@ export default function App() {
               toast('Salvato.');
             }}
             onEaten={() => removeWithUndo(openItem, `${openItem.name}: finito!`)}
+            onFreeze={canFreeze(openItem) ? () => freezeItem(openItem) : null}
             onDelete={() => removeWithUndo(openItem, `${openItem.name}: buttato.`)}
             onShop={() => {
               const key = (x) => (x.food && x.food !== 'altro' ? x.food : x.name.toLowerCase());

@@ -23,7 +23,7 @@ const QUICK_DATES = [
   ['+3 mesi', 90],
 ];
 
-export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onShop, onClose }) {
+export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onShop, onFreeze, onClose }) {
   const [d, setD] = useState({ ...item, macro: macroOf(item) });
   const [picking, setPicking] = useState(false);
   const { state, toast } = useApp();
@@ -107,6 +107,12 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
           </label>
         </div>
 
+        {!isNew && onFreeze && (
+          <div className="freeze-box">
+            <p className="small">Sta per scadere: se lo congeli dura altri 2 mesi.</p>
+            <Btn color="blue" block icon="2744" sound={null} onClick={onFreeze}>Congela</Btn>
+          </div>
+        )}
         {!isNew && (
           <div className="two">
             <Btn color="yellow" icon="1f60b" sound="eat" onClick={onEaten}>Finito!</Btn>
