@@ -1,9 +1,9 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { norm } from '../catalog.js';
 import { actions, cloudEnabled } from '../lib/store.js';
 import { addDays, expiryLabel, expiryStatus, fromISO } from '../lib/dates.js';
 import { newId } from '../lib/items.js';
-import { checkRecipe, melaLink, readMelaFiles } from '../lib/mela.js';
+import { checkRecipe, melaLink, pantryIndex, readMelaFiles } from '../lib/mela.js';
 import { play } from '../lib/sound.js';
 import { Btn, Icon, SectionTitle, Sheet, Talk, useApp } from '../components/ui.jsx';
 import { SLOTS } from './Meals.jsx';
@@ -17,6 +17,7 @@ export default function Recipes() {
   const fileRef = useRef(null);
   const [busy, setBusy] = useState('');
   const [photos, setPhotos] = useState(true);
+  const [onlyNew, setOnlyNew] = useState(true);
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('tutte'); // tutte | ora | scadenza
   const [cat, setCat] = useState('');
@@ -24,16 +25,22 @@ export default function Recipes() {
   const recipes = state.recipes || [];
 
   const soonIds = useMemo(() => new Set(state.items.filter((i) => ['today', 'soon'].includes(expiryStatus(i.expiry, warnDays))).map((i) => i.id)), [state.items, warnDays]);
-  const checked = useMemo(() => recipes.map((r) => ({ r, c: checkRecipe(r, state.items, soonIds) })), [recipes, state.items, soonIds]);
+  const checked = useMemo(() => {
+    const idx = pantryIndex(state.items, soonIds);
+    return recipes.map((r) => ({ r, c: checkRecipe(r, idx), t: norm(`${r.title} ${(r.ingredients || []).join(' ')} ${(r.categories || []).join(' ')}`) }));
+  }, [recipes, state.items, soonIds]);
+  // libri/categorie di Mela, dal più grande
   const cats = useMemo(() => {
     const n = new Map();
     recipes.forEach((r) => (r.categories || []).forEach((c) => n.set(c, (n.get(c) || 0) + 1)));
-    return [...n.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([c]) => c);
+    return [...n.entries()].sort((a, b) => a[0].localeCompare(b[0], 'it'));
   }, [recipes]);
+  const [limit, setLimit] = useState(40);
+  useEffect(() => setLimit(40), [q, filter, cat]);
 
   const nq = norm(q);
   const shown = checked
-    .filter(({ r }) => !nq || norm(`${r.title} ${(r.ingredients || []).join(' ')} ${(r.categories || []).join(' ')}`).includes(nq))
+    .filter(({ t }) => !nq || t.includes(nq))
     .filter(({ r }) => !cat || (r.categories || []).includes(cat))
     .filter(({ c }) => filter !== 'ora' || (c.need > 0 && c.missing.length === 0))
     .filter(({ c }) => filter !== 'scadenza' || c.usesSoon.length > 0)
@@ -49,25 +56,32 @@ export default function Recipes() {
     const known = new Set(recipes.map((r) => r.id));
     let added = 0;
     let saved = 0;
+    // tengo lo schermo acceso: se il telefono si blocca, la lettura si ferma
+    let lock = null;
     try {
-      const { total } = await readMelaFiles(files, me, {
+      lock = await navigator.wakeLock?.request('screen');
+    } catch {}
+    try {
+      const { total, skipped, seen } = await readMelaFiles(files, me, {
         photos,
-        onStep: (n) => setBusy(`Leggo le ricette... ${n}`),
+        skip: onlyNew ? known : null,
+        onStep: (n, sk) => setBusy(`Leggo le ricette... ${n}${sk ? ` (${sk} già presenti)` : ''}`),
         onBatch: async (list) => {
           added += list.filter((r) => !known.has(r.id)).length;
           await actions.recipesPut(list);
           saved += list.length;
         },
       });
-      if (!total) throw new Error('Non trovo ricette in questo file. Serve il file esportato da Mela (.melarecipe o .melarecipes).');
+      if (!seen) throw new Error('Non trovo ricette in questo file. Serve il file esportato da Mela (.melarecipe o .melarecipes).');
       play('add');
-      toast(added === total ? `${total} ricette importate!` : `${added} ricette nuove, ${total - added} aggiornate.`);
+      toast(!total ? `Nessuna ricetta nuova: le ${skipped} del file ci sono già.` : skipped ? `${total} ricette nuove importate (${skipped} c'erano già).` : added === total ? `${total} ricette importate!` : `${added} ricette nuove, ${total - added} aggiornate.`);
     } catch (err) {
       play('error');
       const msg = err?.code === 'permission-denied' ? 'Firebase non mi fa salvare le ricette: aggiorna le regole (vedi sotto).' : err.message || 'Importazione non riuscita.';
       toast(saved ? `${msg} (${saved} ricette erano già state salvate.)` : msg, { err: true });
     } finally {
       setBusy('');
+      lock?.release?.().catch?.(() => {});
     }
   };
 
@@ -112,6 +126,9 @@ export default function Recipes() {
             <input className="input grow" type="search" placeholder="Cerca: pollo, torta, pasta..." value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cerca tra le ricette" />
             <Btn sm icon="1f4e6" onClick={() => fileRef.current?.click()} disabled={!!busy} aria-label="Importa altre ricette da Mela">Importa</Btn>
           </div>
+          <label className="opt-check small" style={{ marginBottom: 8 }}>
+            <input type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} /> Importa solo le ricette nuove (più veloce)
+          </label>
           {busy && <p className="small center blink">{busy}</p>}
           <div className="chips" style={{ marginBottom: 8 }}>
             <button type="button" className={'chip ' + (filter === 'tutte' ? 'on' : '')} onClick={() => setFilter('tutte')}>Tutte ({recipes.length})</button>
@@ -119,16 +136,23 @@ export default function Recipes() {
             <button type="button" className={'chip ' + (filter === 'scadenza' ? 'on' : '')} onClick={() => setFilter('scadenza')}>Usano cibi in scadenza ({nSoon})</button>
           </div>
           {cats.length > 1 && (
-            <div className="chips" style={{ marginBottom: 10 }}>
-              {cats.map((c) => (
-                <button key={c} type="button" className={'chip ' + (cat === c ? 'on' : '')} onClick={() => setCat(cat === c ? '' : c)}>{c}</button>
-              ))}
-            </div>
+            <label className="pick-wrap">
+              <span className="sr-only">Libro o categoria</span>
+              <select className={'input pick ' + (cat ? 'on' : '')} value={cat} onChange={(e) => setCat(e.target.value)}>
+                <option value="">Tutti i libri e le categorie ({cats.length})</option>
+                {cats.map(([c, n]) => (
+                  <option key={c} value={c}>
+                    {c} ({n})
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
+          {shown.length > 0 && <p className="small muted" style={{ margin: '0 0 8px' }}>{shown.length === recipes.length ? `${shown.length} ricette` : `${shown.length} ricette su ${recipes.length}`}</p>}
           <div className="recipe-list">
-            {shown.map(({ r, c }) => (
+            {shown.slice(0, limit).map(({ r, c }) => (
               <button key={r.id} type="button" className="win flat recipe-card" onClick={() => setOpenId(r.id)}>
-                {r.img ? <img src={r.img} alt="" className="recipe-img" /> : <span className="recipe-img ph"><Icon id="1f372" size={34} /></span>}
+                {r.img ? <img src={r.img} alt="" className="recipe-img" loading="lazy" decoding="async" /> : <span className="recipe-img ph"><Icon id="1f372" size={34} /></span>}
                 <span className="grow">
                   <span className="nm">{r.title}</span>
                   <span className="have-bar" aria-hidden="true">
@@ -144,6 +168,9 @@ export default function Recipes() {
               </button>
             ))}
           </div>
+          {shown.length > limit && (
+            <Btn block style={{ marginTop: 12 }} onClick={() => setLimit(limit + 40)}>Mostra altre ({shown.length - limit})</Btn>
+          )}
           {!shown.length && <p className="muted center" style={{ marginTop: 14 }}>Nessuna ricetta corrisponde.</p>}
         </>
       )}

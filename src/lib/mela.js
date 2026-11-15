@@ -1,6 +1,6 @@
 // Ricette da Mela: lettura dei file esportati (.melarecipe = JSON, .melarecipes = zip di JSON)
 // e confronto degli ingredienti con la dispensa.
-import { matchFood, norm } from '../catalog.js';
+import { BY_KEY, matchFood, norm } from '../catalog.js';
 
 // cose che quasi sempre hai in casa: non contano come "mancanti"
 export const BASICS = new Set(['sale', 'pepe', 'olio', 'acqua', 'aceto', 'spezie']);
@@ -41,17 +41,25 @@ function thumb(b64) {
   });
 }
 
+const idOf = (raw) => {
+  const melaId = String(raw.id || '');
+  return UUID.test(melaId) ? melaId : 'r' + hash(melaId || String(raw.title || ''));
+};
+
 async function normalize(raw, by) {
   if (!raw || typeof raw !== 'object' || !raw.title) return null;
   const melaId = String(raw.id || '');
-  const id = UUID.test(melaId) ? melaId : 'r' + hash(melaId || raw.title);
+  const id = idOf(raw);
+  const ingredients = lines(raw.ingredients).slice(0, 80).map((l) => l.slice(0, 200));
   const images = Array.isArray(raw.images) ? raw.images : [];
   return {
     id,
     melaId,
     title: String(raw.title).trim().slice(0, 150),
     text: String(raw.text || '').trim().slice(0, 2000),
-    ingredients: lines(raw.ingredients).slice(0, 80).map((l) => l.slice(0, 200)),
+    ingredients,
+    // cibo riconosciuto per ogni riga ('#' = titoletto, '' = non riconosciuto): calcolato una volta sola qui
+    foods: ingredients.map((l) => (/^#/.test(l) ? '#' : matchFood(l.replace(/^[-•*]\s*/, ''))?.key || '')),
     instructions: String(raw.instructions || '').trim().slice(0, 15000),
     notes: String(raw.notes || '').trim().slice(0, 4000),
     yield: String(raw.yield || '').trim().slice(0, 60),
@@ -89,11 +97,13 @@ const readSlice = async (f, from, to) => {
 
 // Legge i file scelti a pezzi, una ricetta alla volta, senza mai tenere in memoria l'export intero.
 // onBatch(ricette) viene chiamata ogni ~50 ricette (per salvarle man mano); onStep(n) per il contatore.
-export async function readMelaFiles(files, by, { onBatch, onStep, photos = true } = {}) {
+export async function readMelaFiles(files, by, { onBatch, onStep, photos = true, skip = null } = {}) {
   const dec = new TextDecoder();
   let batch = [];
   let total = 0;
   let bad = 0;
+  let skipped = 0;
+  let seen = 0;
   const handle = async (bytes) => {
     let raw;
     try {
@@ -103,12 +113,19 @@ export async function readMelaFiles(files, by, { onBatch, onStep, photos = true 
       return;
     }
     for (const r of Array.isArray(raw) ? raw : [raw]) {
-      if (!photos && r) r.images = [];
+      if (!r || typeof r !== 'object' || !r.title) continue;
+      seen++;
+      if (skip && skip.has(idOf(r))) {
+        skipped++;
+        if (seen % 25 === 0) onStep?.(seen, skipped);
+        continue;
+      }
+      if (!photos) r.images = [];
       const n = await normalize(r, by);
       if (!n) continue;
       batch.push(n);
       total++;
-      onStep?.(total);
+      onStep?.(seen, skipped);
       if (batch.length >= 50) {
         const b = batch;
         batch = [];
@@ -150,38 +167,57 @@ export async function readMelaFiles(files, by, { onBatch, onStep, photos = true 
     }
   }
   if (batch.length) await onBatch?.(batch);
-  return { total, bad };
+  return { total, bad, skipped, seen };
 }
 
 // Un ingrediente di Mela ("# Per il sugo" è un titoletto) → cibo del catalogo
-export function parseIngredient(line) {
-  if (/^#/.test(line)) return { line: line.replace(/^#+\s*/, ''), header: true };
+export function parseIngredient(line, key) {
+  if (key === '#' || /^#/.test(line)) return { line: line.replace(/^#+\s*/, ''), header: true };
   const clean = line.replace(/^[-•*]\s*/, '');
-  const food = matchFood(clean);
+  const food = key !== undefined ? (key ? BY_KEY[key] || null : null) : matchFood(clean);
   return { line: clean, food: food || null, basic: !!(food && BASICS.has(food.key)) };
 }
 
-// Confronto con la dispensa: cosa hai, cosa manca, quali cibi in scadenza usa
-export function checkRecipe(recipe, items, soonIds = new Set()) {
+// righe già analizzate, per non rifare il riconoscimento a ogni aggiornamento (con migliaia di ricette conta)
+const rowsCache = new Map();
+function rowsOf(recipe) {
+  const k = `${recipe.id}|${recipe.importedAt || 0}`;
+  let rows = rowsCache.get(k);
+  if (!rows) {
+    const ing = recipe.ingredients || [];
+    const f = Array.isArray(recipe.foods) && recipe.foods.length === ing.length ? recipe.foods : null;
+    rows = ing.map((l, i) => parseIngredient(l, f ? f[i] : undefined));
+    rowsCache.set(k, rows);
+  }
+  return rows;
+}
+
+// La dispensa indicizzata una volta per tutte le ricette
+export function pantryIndex(items, soonIds = new Set()) {
   const byFood = new Map();
   for (const it of items) {
     if (!it.food || it.food === 'altro') continue;
     if (!byFood.has(it.food)) byFood.set(it.food, []);
     byFood.get(it.food).push(it);
   }
-  const names = items.map((it) => ({ it, n: norm(it.name) }));
-  const rows = (recipe.ingredients || []).map(parseIngredient);
+  return { byFood, names: items.map((it) => ({ it, n: norm(it.name) })), soonIds, byName: new Map() };
+}
+
+// Confronto con la dispensa: cosa hai, cosa manca, quali cibi in scadenza usa
+export function checkRecipe(recipe, idx) {
+  const rows = rowsOf(recipe).map((r) => ({ ...r }));
   let have = 0;
   let need = 0;
   const missing = [];
   const usesSoon = [];
   for (const r of rows) {
     if (r.header || !r.food) continue;
-    let found = byFood.get(r.food.key) || [];
+    let found = idx.byFood.get(r.food.key) || [];
     if (!found.length) {
       // per i cibi fuori catalogo: nome uguale
       const w = norm(r.food.name).split(' ')[0];
-      found = names.filter((x) => w.length > 3 && x.n.includes(w)).map((x) => x.it);
+      if (!idx.byName.has(w)) idx.byName.set(w, idx.names.filter((x) => w.length > 3 && x.n.includes(w)).map((x) => x.it));
+      found = idx.byName.get(w);
     }
     r.have = found.length > 0;
     r.items = found;
@@ -189,8 +225,8 @@ export function checkRecipe(recipe, items, soonIds = new Set()) {
     need++;
     if (r.have) {
       have++;
-      const soon = found.filter((it) => soonIds.has(it.id));
-      if (soon.length) usesSoon.push(soon[0]);
+      const soon = found.find((it) => idx.soonIds.has(it.id));
+      if (soon) usesSoon.push(soon);
     } else missing.push(r);
   }
   return { rows, have, need, missing, usesSoon, ratio: need ? have / need : 0 };
