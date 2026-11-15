@@ -9,6 +9,16 @@ import { Btn, Icon, SectionTitle, Sheet, Talk, useApp } from '../components/ui.j
 import { SLOTS } from './Meals.jsx';
 
 const GIORNI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+
+// ordinamenti della lista; le ricette con ingredienti non riconosciuti vanno sempre in fondo
+const known = (x) => (x.c.need ? 0 : 1);
+const byName = (a, b) => a.r.title.localeCompare(b.r.title, 'it');
+const byHave = (a, b) => known(a) - known(b) || b.c.ratio - a.c.ratio || a.c.missing.length - b.c.missing.length;
+const SORTS = {
+  manca: { label: 'Prima quelle a cui manca meno', fn: (a, b) => byHave(a, b) || b.c.usesSoon.length - a.c.usesSoon.length || byName(a, b) },
+  scadenza: { label: 'Prima quelle che usano cibi in scadenza', fn: (a, b) => b.c.usesSoon.length - a.c.usesSoon.length || byHave(a, b) || byName(a, b) },
+  nome: { label: 'In ordine alfabetico', fn: byName },
+};
 const keyOf = (x) => (x.food && x.food !== 'altro' ? x.food : norm(x.name));
 
 export default function Recipes() {
@@ -18,6 +28,19 @@ export default function Recipes() {
   const [busy, setBusy] = useState('');
   const [photos, setPhotos] = useState(true);
   const [onlyNew, setOnlyNew] = useState(true);
+  const [sort, setSort] = useState(() => {
+    try {
+      return SORTS[localStorage.getItem('dm_rsort')] ? localStorage.getItem('dm_rsort') : 'manca';
+    } catch {
+      return 'manca';
+    }
+  });
+  const pickSort = (v) => {
+    setSort(v);
+    try {
+      localStorage.setItem('dm_rsort', v);
+    } catch {}
+  };
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('tutte'); // tutte | ora | scadenza
   const [cat, setCat] = useState('');
@@ -36,7 +59,7 @@ export default function Recipes() {
     return [...n.entries()].sort((a, b) => a[0].localeCompare(b[0], 'it'));
   }, [recipes]);
   const [limit, setLimit] = useState(40);
-  useEffect(() => setLimit(40), [q, filter, cat]);
+  useEffect(() => setLimit(40), [q, filter, cat, sort]);
 
   const nq = norm(q);
   const shown = checked
@@ -44,7 +67,7 @@ export default function Recipes() {
     .filter(({ r }) => !cat || (r.categories || []).includes(cat))
     .filter(({ c }) => filter !== 'ora' || (c.need > 0 && c.missing.length === 0))
     .filter(({ c }) => filter !== 'scadenza' || c.usesSoon.length > 0)
-    .sort((a, b) => b.c.usesSoon.length - a.c.usesSoon.length || a.c.missing.length - b.c.missing.length || b.c.ratio - a.c.ratio || a.r.title.localeCompare(b.r.title));
+    .sort(SORTS[sort].fn);
   const nNow = checked.filter(({ c }) => c.need > 0 && !c.missing.length).length;
   const nSoon = checked.filter(({ c }) => c.usesSoon.length).length;
 
@@ -148,6 +171,16 @@ export default function Recipes() {
               </select>
             </label>
           )}
+          <label className="pick-wrap">
+            <span className="sr-only">Ordina le ricette</span>
+            <select className="input pick" value={sort} onChange={(e) => pickSort(e.target.value)}>
+              {Object.entries(SORTS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v.label}
+                </option>
+              ))}
+            </select>
+          </label>
           {shown.length > 0 && <p className="small muted" style={{ margin: '0 0 8px' }}>{shown.length === recipes.length ? `${shown.length} ricette` : `${shown.length} ricette su ${recipes.length}`}</p>}
           <div className="recipe-list">
             {shown.slice(0, limit).map(({ r, c }) => (

@@ -170,12 +170,23 @@ export async function readMelaFiles(files, by, { onBatch, onStep, photos = true,
   return { total, bad, skipped, seen };
 }
 
+// Tipi diversi dello stesso cibo: "farina di segale" non è la farina normale che hai in casa.
+// Se la riga nomina un tipo, serve un cibo in dispensa con quel tipo nel nome; se non lo nomina,
+// non vale un cibo di un tipo speciale (la farina di riso non sostituisce la farina 00).
+const VARIANTS = {
+  farina: ['segale', 'orzo', 'avena', 'riso', 'mais', 'farro', 'ceci', 'castagn', 'mandorl', 'cocco', 'saraceno', 'integral', 'manitoba', 'semol', 'kamut', 'tapioca', 'patat', 'lenticch', 'nocciol', 'quinoa', 'amaranto', 'miglio', 'fecola', 'maizena', 'amido', 'duro', 'piselli', 'pistacch', 'carrub', 'canapa', 'teff', 'sorgo'],
+  latte: ['soia', 'avena', 'riso', 'mandorl', 'cocco', 'condensat', 'polvere', 'capra', 'pecora', 'nocciol'],
+  zucchero: ['canna', 'velo', 'muscovado', 'grezzo', 'cocco'],
+  riso: ['venere', 'nero', 'rosso', 'basmati', 'jasmine', 'integral', 'selvaggio', 'glutinoso', 'sushi'],
+};
+const variantsIn = (key, text) => (VARIANTS[key] || []).filter((v) => text.includes(v));
+
 // Un ingrediente di Mela ("# Per il sugo" è un titoletto) → cibo del catalogo
 export function parseIngredient(line, key) {
   if (key === '#' || /^#/.test(line)) return { line: line.replace(/^#+\s*/, ''), header: true };
   const clean = line.replace(/^[-•*]\s*/, '');
   const food = key !== undefined ? (key ? BY_KEY[key] || null : null) : matchFood(clean);
-  return { line: clean, food: food || null, basic: !!(food && BASICS.has(food.key)) };
+  return { line: clean, food: food || null, basic: !!(food && BASICS.has(food.key)), variant: food ? variantsIn(food.key, norm(clean)) : [] };
 }
 
 // righe già analizzate, per non rifare il riconoscimento a ogni aggiornamento (con migliaia di ricette conta)
@@ -200,7 +211,7 @@ export function pantryIndex(items, soonIds = new Set()) {
     if (!byFood.has(it.food)) byFood.set(it.food, []);
     byFood.get(it.food).push(it);
   }
-  return { byFood, names: items.map((it) => ({ it, n: norm(it.name) })), soonIds, byName: new Map() };
+  return { byFood, names: items.map((it) => ({ it, n: norm(it.name) })), soonIds, byName: new Map(), byVariant: new Map() };
 }
 
 // Confronto con la dispensa: cosa hai, cosa manca, quali cibi in scadenza usa
@@ -213,7 +224,20 @@ export function checkRecipe(recipe, idx) {
   for (const r of rows) {
     if (r.header || !r.food) continue;
     let found = idx.byFood.get(r.food.key) || [];
-    if (!found.length) {
+    if (VARIANTS[r.food.key] && found.length) {
+      const k = `${r.food.key}|${r.variant.join(',')}`;
+      if (!idx.byVariant.has(k)) {
+        idx.byVariant.set(
+          k,
+          found.filter((it) => {
+            const has = variantsIn(r.food.key, norm(it.name));
+            return r.variant.length ? r.variant.some((v) => has.includes(v)) : !has.length;
+          })
+        );
+      }
+      found = idx.byVariant.get(k);
+    }
+    if (!found.length && !VARIANTS[r.food.key]) {
       // per i cibi fuori catalogo: nome uguale
       const w = norm(r.food.name).split(' ')[0];
       if (!idx.byName.has(w)) idx.byName.set(w, idx.names.filter((x) => w.length > 3 && x.n.includes(w)).map((x) => x.it));
@@ -226,7 +250,7 @@ export function checkRecipe(recipe, idx) {
     if (r.have) {
       have++;
       const soon = found.find((it) => idx.soonIds.has(it.id));
-      if (soon) usesSoon.push(soon);
+      if (soon && !usesSoon.includes(soon)) usesSoon.push(soon);
     } else missing.push(r);
   }
   return { rows, have, need, missing, usesSoon, ratio: need ? have / need : 0 };
