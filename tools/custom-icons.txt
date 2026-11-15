@@ -816,3 +816,15 @@ oooooooOOO
 .ooooooOO.
 ..OOOOOO..
 ..........
+
+@melograno
+...R.R....
+...RRR....
+..rrrrrr..
+.rrwrrrrR.
+rrwrrrrrRR
+rrrrrrrrRR
+rrrrrrrRRR
+.rrrrrRRR.
+..RRRRRR..
+..........

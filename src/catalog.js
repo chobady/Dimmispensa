@@ -75,6 +75,7 @@ const ROWS = [
   ['prugna', 'Prugne', 'prugna', 'frutta', 'F', 7, 'pz', 'prugne|susina|susine'],
   ['fico', 'Fichi', 'fico', 'frutta', 'F', 3, 'pz', 'fichi'],
   ['kiwi', 'Kiwi', '1f95d', 'frutta', 'F', 14, 'pz', ''],
+  ['melograno', 'Melograno', 'melograno', 'frutta', 'F', 21, 'pz', 'melagrana|melagrane|melograni|chicchi di melograno|grani di melograno'],
   ['kaki', 'Kaki', 'kaki', 'frutta', 'F', 7, 'pz', 'cachi|caco|kako|loto|diospiro|sharon'],
   ['ananas', 'Ananas', '1f34d', 'frutta', 'F', 5, 'pz', ''],
   ['mango', 'Mango', '1f96d', 'frutta', 'F', 5, 'pz', 'papaya'],
@@ -338,6 +339,7 @@ const EN_KW = {
   fico: 'fig|figs',
   kiwi: 'kiwi|kiwis',
   kaki: 'persimmon|persimmons|sharon fruit',
+  melograno: 'pomegranate|pomegranates|pomegranate seeds|pomegranate arils',
   ananas: 'pineapple',
   mango: 'mango|mangos|papaya',
   melone: 'melon|cantaloupe|honeydew',
@@ -487,7 +489,7 @@ export const macroOf = (item) => (item.macro !== undefined && item.macro !== '' 
 
 // Peso medio di un pezzo (g o ml): serve per pesare nei pasti i cibi contati a pezzi
 export const PIECE_G = {
-  uova: 60, mela: 180, melaverde: 180, pera: 170, banana: 120, arancia: 150, mandarino: 80, limone: 100, kiwi: 75, kaki: 200, pesca: 150, prugna: 60, fico: 50,
+  uova: 60, mela: 180, melaverde: 180, pera: 170, banana: 120, arancia: 150, mandarino: 80, limone: 100, kiwi: 75, kaki: 200, melograno: 300, pesca: 150, prugna: 60, fico: 50,
   avocado: 170, pomodoro: 120, zucchina: 200, melanzana: 300, peperone: 160, cetriolo: 300, cipolla: 120, carota: 80, patatadolce: 200,
   finocchio: 250, carciofo: 150, sedano: 400, porro: 200, cavolfiore: 600, broccoli: 400, radicchio: 250, ananas: 1000, melone: 1200,
   mango: 300, cocco: 500, mozzarella: 125, yogurt: 125, budino: 100, formaggio: 200, burro: 250, parmigiano: 300, salame: 200,
