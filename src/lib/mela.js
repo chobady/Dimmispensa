@@ -230,6 +230,15 @@ function rowsOf(recipe) {
   return rows;
 }
 
+// Prodotti "al gusto di": una salsa ai granchi non è granchio, le patatine al formaggio non sono formaggio.
+// Valgono solo se anche la riga della ricetta nomina lo stesso tipo di prodotto.
+const DERIVED = ['salsa', 'salse', 'sugo', 'sughi', 'sughetto', 'condimento', 'dado', 'brodo', 'aroma', 'aromi', 'gusto', 'sapore', 'insaporitore', 'patatine', 'chips', 'snack', 'cracker', 'tisana', 'infuso', 'caramelle', 'budino', 'merendina', 'barretta', 'bevanda', 'liquore', 'sciroppo', 'crema'];
+const derivedOf = (text) => DERIVED.filter((d) => new RegExp(`\\b${d}\\b`).test(text));
+function fits(it, lineNorm) {
+  const d = derivedOf(norm(it.name));
+  return !d.length || d.some((x) => lineNorm.includes(x));
+}
+
 // La dispensa indicizzata una volta per tutte le ricette
 export function pantryIndex(items, soonIds = new Set()) {
   const byFood = new Map();
@@ -255,7 +264,8 @@ export function checkRecipe(recipe, idx) {
     if (!r.food) {
       // non nel catalogo: ce l'hai se un cibo della dispensa ha una parola importante in comune
       const words = ingredientWords(r.line);
-      r.items = words.length ? idx.names.filter((x) => words.some((w) => x.w.some((n) => sameWord(n, w)))).map((x) => x.it) : [];
+      const ln = norm(r.line);
+      r.items = words.length ? idx.names.filter((x) => words.some((w) => x.w.some((n) => sameWord(n, w)))).map((x) => x.it).filter((it) => fits(it, ln)) : [];
       r.have = r.items.length > 0;
       r.unknown = true;
       if (!words.length) {
@@ -267,6 +277,7 @@ export function checkRecipe(recipe, idx) {
       else missing.push(r);
       continue;
     }
+    const ln = norm(r.line);
     let found = idx.byFood.get(r.food.key) || [];
     if (VARIANTS[r.food.key] && found.length) {
       const k = `${r.food.key}|${r.variant.join(',')}`;
@@ -281,11 +292,12 @@ export function checkRecipe(recipe, idx) {
       }
       found = idx.byVariant.get(k);
     }
+    found = found.filter((it) => fits(it, ln));
     if (!found.length && !VARIANTS[r.food.key]) {
       // per i cibi fuori catalogo: nome uguale
       const w = norm(r.food.name).split(' ')[0];
       if (!idx.byName.has(w)) idx.byName.set(w, idx.names.filter((x) => w.length > 3 && x.w.some((n) => sameWord(n, w))).map((x) => x.it));
-      found = idx.byName.get(w);
+      found = idx.byName.get(w).filter((it) => fits(it, ln));
     }
     r.have = found.length > 0;
     r.items = found;

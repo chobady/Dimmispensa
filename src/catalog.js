@@ -254,6 +254,8 @@ export function matchFood(text) {
       }
     }
   }
+  // "Salsa coreana ai granchi", "Sugo al tonno": è un sugo, non granchio o tonno
+  if (best && /^\s*(salsa|salse|sugo|sughetto|condimento|crema spalmabile)\b/.test(t) && !['pesto', 'sugo', 'maionese', 'ketchup', 'senape', 'soia', 'passata', 'pelati'].includes(best.key)) best = BY_KEY.sugo || best;
   return best;
 }
 
