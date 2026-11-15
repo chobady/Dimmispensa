@@ -162,6 +162,14 @@ Ogni persona della famiglia le attiva sul suo telefono, con il suo account.
 - "non è un JSON valido" → hai copiato solo un pezzo del file: ricopialo tutto.
 - Nessuna notifica ma nessun errore → controlla che le notifiche per Dimmispensa (o per Chrome) siano permesse nelle impostazioni del telefono.
 
+## Parte F — Ricette da Mela
+
+1. **Una volta sola:** le ricette hanno bisogno delle regole nuove di Firebase. Firebase → **Firestore Database** → **Regole** → cancella tutto, incolla il contenuto di `firestore.rules` (su GitHub) → **Pubblica**.
+2. In **Mela**: seleziona le ricette (o tutte) → **Condividi** → **Esporta** → salva il file `.melarecipes` in File / iCloud Drive.
+3. In **Dimmispensa**: **Pasti → Ricette → Importa da Mela** → scegli il file.
+
+Quando aggiungi ricette nuove in Mela, rifai l'esportazione e importa di nuovo: quelle già presenti vengono aggiornate, non doppiate.
+
 ## Se qualcosa non va
 
 | Cosa vedi | Cosa è successo | Soluzione |

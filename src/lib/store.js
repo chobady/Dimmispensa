@@ -36,6 +36,8 @@ let state = {
   user: null, // { uid, email, name }
   pantry: null, // { id, name, members, memberNames, geminiKey }
   items: [],
+  recipes: [],
+  recipesError: '',
   offers: {}, // offerte lette dai volantini: { id: { name, brand, price, oldPrice, size, until, store, food, icon } }
   flyerLinks: {}, // supermercati preferiti: { id: { name, url } }
   shopping: {}, // { id: { id, name, qty, unit, food, icon, cat, done, by, addedAt } }
@@ -68,7 +70,10 @@ const lsGet = (k, fallback) => {
 const lsSet = (k, v) => {
   try {
     localStorage.setItem(k, JSON.stringify(v));
-  } catch {}
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 export const localItemsCount = () => lsGet(LS_ITEMS, []).length;
@@ -78,7 +83,7 @@ const local = {
   start() {
     const meals = lsGet(LS_MEALS, {});
     oldMealDays(meals).forEach((d) => delete meals[d]);
-    set({ phase: 'ready', pantry: { id: 'local', name: 'La mia dispensa', local: true, geminiKey: lsGet(LS_KEY, ''), usdaKey: lsGet(LS_USDA, '') }, items: lsGet(LS_ITEMS, []), meals, shopping: lsGet(LS_SHOP, {}), finished: lsGet(LS_FIN, {}), offers: pruneOffers(lsGet('dm_offers', {})), flyerLinks: lsGet('dm_links', {}) });
+    set({ phase: 'ready', pantry: { id: 'local', name: 'La mia dispensa', local: true, geminiKey: lsGet(LS_KEY, ''), usdaKey: lsGet(LS_USDA, '') }, items: lsGet(LS_ITEMS, []), meals, shopping: lsGet(LS_SHOP, {}), finished: lsGet(LS_FIN, {}), offers: pruneOffers(lsGet('dm_offers', {})), flyerLinks: lsGet('dm_links', {}), recipes: lsGet('dm_recipes', []) });
     window.addEventListener('storage', (e) => {
       if (e.key === LS_ITEMS) set({ items: lsGet(LS_ITEMS, []) });
       if (e.key === LS_MEALS) set({ meals: lsGet(LS_MEALS, {}) });
@@ -90,6 +95,17 @@ const local = {
   save(items) {
     lsSet(LS_ITEMS, items);
     set({ items });
+  },
+  async recipesPut(list) {
+    const ids = new Set(list.map((r) => r.id));
+    const next = [...state.recipes.filter((r) => !ids.has(r.id)), ...list];
+    if (!lsSet('dm_recipes', next)) throw new Error('Spazio finito sul dispositivo: senza Firebase le ricette con foto occupano troppo.');
+    set({ recipes: next });
+  },
+  async recipeRemove(id) {
+    const next = state.recipes.filter((r) => r.id !== id);
+    lsSet('dm_recipes', next);
+    set({ recipes: next });
   },
   async addItems(drafts) {
     const now = Date.now();
@@ -153,6 +169,7 @@ let fb = null; // moduli e istanze Firebase, caricati solo se servono
 let unsubUser = null;
 let unsubPantry = null;
 let unsubItems = null;
+let unsubRecipes = null;
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const newCode = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => CODE_CHARS[b % CODE_CHARS.length]).join('');
@@ -223,8 +240,8 @@ const cloud = {
   },
 
   stopListening() {
-    [unsubUser, unsubPantry, unsubItems].forEach((u) => u && u());
-    unsubUser = unsubPantry = unsubItems = null;
+    [unsubUser, unsubPantry, unsubItems, unsubRecipes].forEach((u) => u && u());
+    unsubUser = unsubPantry = unsubItems = unsubRecipes = null;
   },
 
   onUser(user) {
@@ -244,7 +261,8 @@ const cloud = {
         currentPantry = pid;
         if (unsubPantry) unsubPantry();
         if (unsubItems) unsubItems();
-        unsubPantry = unsubItems = null;
+        if (unsubRecipes) unsubRecipes();
+        unsubPantry = unsubItems = unsubRecipes = null;
         if (!pid) {
           set({ phase: 'nopantry', pantry: null, items: [] });
           return;
@@ -287,6 +305,28 @@ const cloud = {
       },
       (e) => console.error(e)
     );
+    if (unsubRecipes) unsubRecipes();
+    unsubRecipes = F.onSnapshot(
+      F.collection(db, 'pantries', pid, 'recipes'),
+      (snap) => set({ recipes: snap.docs.map((d) => ({ ...d.data(), id: d.id })), recipesError: '' }),
+      (e) => {
+        console.error(e);
+        set({ recipesError: e?.code === 'permission-denied' ? 'rules' : 'other' });
+      }
+    );
+  },
+  async recipesPut(list) {
+    const { db, F } = fb;
+    const pid = state.pantry.id;
+    for (let i = 0; i < list.length; i += 200) {
+      const batch = F.writeBatch(db);
+      list.slice(i, i + 200).forEach((r) => batch.set(F.doc(db, 'pantries', pid, 'recipes', r.id), r));
+      await batch.commit();
+    }
+  },
+  async recipeRemove(id) {
+    const { db, F } = fb;
+    await F.deleteDoc(F.doc(db, 'pantries', state.pantry.id, 'recipes', id));
   },
 
   async signUp(name, email, password) {
@@ -471,6 +511,8 @@ export const actions = {
   joinPantry: cloud.joinPantry,
   leavePantry: cloud.leavePantry,
   renamePantry: cloud.renamePantry,
+  recipesPut: (list) => impl.recipesPut(list),
+  recipeRemove: (id) => impl.recipeRemove(id),
   savePush: cloud.savePush,
   removePush: cloud.removePush,
   setNotifyDays: cloud.setNotifyDays,

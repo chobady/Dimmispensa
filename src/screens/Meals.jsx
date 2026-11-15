@@ -9,6 +9,8 @@ import { portionGrams, sumMacros } from '../lib/macros.js';
 import { play } from '../lib/sound.js';
 import { Btn, Icon, Sheet, Talk, useApp } from '../components/ui.jsx';
 import { byExpiry } from './Pantry.jsx';
+import Recipes from './Recipes.jsx';
+import { melaLink } from '../lib/mela.js';
 
 export const SLOTS = [
   { id: 'colazione', name: 'Colazione', icon: '2615' },
@@ -92,8 +94,35 @@ const reservedFor = (meals, itemId, fromDate, skipEntryId) => {
   return r;
 };
 
+function MealTabs({ tab, pick, nRecipes }) {
+  return (
+    <div className="seg" role="tablist" aria-label="Pasti" style={{ marginBottom: 14 }}>
+      <button type="button" role="tab" aria-selected={tab === 'calendario'} className={tab === 'calendario' ? 'on' : ''} onClick={() => pick('calendario')}>
+        <Icon id="1f4c5" size={20} /> Calendario
+      </button>
+      <button type="button" role="tab" aria-selected={tab === 'ricette'} className={tab === 'ricette' ? 'on' : ''} onClick={() => pick('ricette')}>
+        <Icon id="1f372" size={20} /> Ricette {nRecipes ? `(${nRecipes})` : ''}
+      </button>
+    </div>
+  );
+}
+
 export default function Meals() {
   const { state, warnDays } = useApp();
+  const [tab, setTab] = useState(() => {
+    try {
+      return localStorage.getItem('dm_mealtab') || 'calendario';
+    } catch {
+      return 'calendario';
+    }
+  });
+  const pickTab = (t) => {
+    play('tap');
+    setTab(t);
+    try {
+      localStorage.setItem('dm_mealtab', t);
+    } catch {}
+  };
   const today = todayISO();
   const [day, setDay] = useState(today);
   const [monday, setMonday] = useState(mondayOf(today));
@@ -151,8 +180,18 @@ export default function Meals() {
     actions.setMealSlot(date, slot, list);
   };
 
+  if (tab === 'ricette') {
+    return (
+      <>
+        <MealTabs tab={tab} pick={pickTab} nRecipes={(state.recipes || []).length} />
+        <Recipes />
+      </>
+    );
+  }
+
   return (
     <>
+      <MealTabs tab={tab} pick={pickTab} nRecipes={(state.recipes || []).length} />
       <Talk text={text} mood={mood} />
 
       <div className="cal-head">
@@ -496,10 +535,15 @@ function EntrySheet({ date, slot, entry, item, onClose, onRemove }) {
           <div className="grow">
             <p className="nm">{entry.name}{entry.item && (entry.qty || entry.all) ? ` · ${portionLabel(entry)}` : ''}</p>
             <p className="small muted">
-              {item ? `In dispensa: ${qtyLabel(item)} · ${expiryLabel(item.expiry, item.est)}` : entry.item ? 'Non è più in dispensa.' : 'Piatto scritto a mano, non dalla dispensa.'}
+              {item ? `In dispensa: ${qtyLabel(item)} · ${expiryLabel(item.expiry, item.est)}` : entry.item ? 'Non è più in dispensa.' : entry.recipe ? 'Ricetta da Mela.' : 'Piatto scritto a mano, non dalla dispensa.'}
             </p>
           </div>
         </div>
+        {entry.recipe && melaLink(entry) && (
+          <a className="btn block" href={melaLink(entry)}>
+            <Icon id="1f372" size={20} /> Apri la ricetta in Mela
+          </a>
+        )}
         {entry.done ? (
           <>
             <p className="win flat small" style={{ background: '#d8f5c8' }}>Segnato come mangiato.</p>
