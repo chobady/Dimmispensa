@@ -304,7 +304,7 @@ export default function Flyers({ shopList }) {
   const shown = offers
     .filter((o) => storeOk(o, mine))
     .filter((o) => !only || offerSlug(o) === only)
-    .filter((o) => !nq || norm(`${o.name} ${o.brand} ${o.store}`).includes(nq))
+    .filter((o) => { const t = norm(`${o.name} ${o.brand} ${o.store}`); return nq.split(' ').filter(Boolean).every((w) => t.includes(w)); })
     .filter((o) => view !== 'lista' || inList(o));
   const disc = (o) => (o.oldPrice ? 1 - o.price / o.oldPrice : 0);
   const groups = [...new Set(shown.map((o) => o.store))]

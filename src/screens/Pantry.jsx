@@ -30,7 +30,7 @@ export default function Pantry() {
     const nq = norm(q);
     return items
       .filter((i) => loc === 'tutto' || i.loc === loc)
-      .filter((i) => !nq || norm(i.name + ' ' + (i.brand || '')).includes(nq))
+      .filter((i) => { const t = norm(i.name + ' ' + (i.brand || '')); return nq.split(' ').filter(Boolean).every((w) => t.includes(w)); })
       .filter((i) => macro === 'tutti' || macroOf(i) === macro)
       .sort(byExpiry);
   }, [items, loc, q, macro]);

@@ -61,9 +61,10 @@ export default function Recipes() {
   const [limit, setLimit] = useState(40);
   useEffect(() => setLimit(40), [q, filter, cat, sort]);
 
-  const nq = norm(q);
+  // ogni parola cercata deve esserci, in qualunque ordine ("porri patat" trova "crema di patate e porri")
+  const qWords = norm(q).split(' ').filter(Boolean);
   const shown = checked
-    .filter(({ t }) => !nq || t.includes(nq))
+    .filter(({ t }) => qWords.every((w) => t.includes(w)))
     .filter(({ r }) => !cat || (r.categories || []).includes(cat))
     .filter(({ c }) => filter !== 'ora' || (c.need > 0 && c.missing.length === 0))
     .filter(({ c }) => filter !== 'scadenza' || c.usesSoon.length > 0)
