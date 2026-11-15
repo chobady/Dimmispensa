@@ -627,3 +627,5 @@ body.no-scroll { overflow: hidden; }
 .soon-inline { color: var(--shell); font-weight: 700; }
 .recipe-text p { margin: 0 0 10px; line-height: 1.5; }
 .recipe-text h4 { font-family: var(--font-title); font-size: 10px; margin: 14px 0 6px; }
+.opt-check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.opt-check input { width: 20px; height: 20px; accent-color: var(--shell); }

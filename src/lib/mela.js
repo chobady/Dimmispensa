@@ -67,36 +67,90 @@ async function normalize(raw, by) {
 }
 
 const isZip = (bytes) => bytes[0] === 0x50 && bytes[1] === 0x4b;
-
-// Legge uno o più file scelti dall'utente e restituisce le ricette pronte da salvare
-export async function readMelaFiles(files, by) {
-  const raws = [];
-  const dec = new TextDecoder();
-  for (const f of files) {
-    const bytes = new Uint8Array(await f.arrayBuffer());
-    if (isZip(bytes)) {
-      const { unzipSync } = await import('fflate');
-      const entries = unzipSync(bytes);
-      for (const [name, data] of Object.entries(entries)) {
-        if (name.startsWith('__MACOSX') || !/\.(melarecipe|json)$/i.test(name)) continue;
-        try {
-          raws.push(JSON.parse(dec.decode(data)));
-        } catch {}
-      }
-    } else {
-      try {
-        const j = JSON.parse(dec.decode(bytes));
-        if (Array.isArray(j)) raws.push(...j);
-        else raws.push(j);
-      } catch {}
-    }
-  }
-  const out = [];
-  for (const r of raws) {
-    const n = await normalize(r, by);
-    if (n) out.push(n);
+const CHUNK = 4 * 1024 * 1024; // leggo il file a pezzi da 4 MB: un export con tante foto può pesare giga
+const concat = (parts) => {
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let o = 0;
+  for (const p of parts) {
+    out.set(p, o);
+    o += p.length;
   }
   return out;
+};
+const ioError = (e) =>
+  Object.assign(new Error("Il telefono non riesce a leggere il file. Se è su iCloud, aprilo prima in File per scaricarlo sul telefono (o salvalo in \"Sul mio iPhone\"), poi riprova. Se è enorme, esporta da Mela un libro alla volta."), { cause: e });
+const readSlice = async (f, from, to) => {
+  try {
+    return new Uint8Array(await f.slice(from, to).arrayBuffer());
+  } catch (e) {
+    throw ioError(e);
+  }
+};
+
+// Legge i file scelti a pezzi, una ricetta alla volta, senza mai tenere in memoria l'export intero.
+// onBatch(ricette) viene chiamata ogni ~50 ricette (per salvarle man mano); onStep(n) per il contatore.
+export async function readMelaFiles(files, by, { onBatch, onStep, photos = true } = {}) {
+  const dec = new TextDecoder();
+  let batch = [];
+  let total = 0;
+  let bad = 0;
+  const handle = async (bytes) => {
+    let raw;
+    try {
+      raw = JSON.parse(dec.decode(bytes));
+    } catch {
+      bad++;
+      return;
+    }
+    for (const r of Array.isArray(raw) ? raw : [raw]) {
+      if (!photos && r) r.images = [];
+      const n = await normalize(r, by);
+      if (!n) continue;
+      batch.push(n);
+      total++;
+      onStep?.(total);
+      if (batch.length >= 50) {
+        const b = batch;
+        batch = [];
+        await onBatch?.(b);
+      }
+    }
+  };
+
+  for (const f of files) {
+    const head = await readSlice(f, 0, 4);
+    if (!isZip(head)) {
+      // un solo .melarecipe (JSON)
+      await handle(await readSlice(f, 0, f.size));
+      continue;
+    }
+    const { Unzip, UnzipInflate } = await import('fflate');
+    const ready = [];
+    let zipErr = null;
+    const uz = new Unzip();
+    uz.register(UnzipInflate);
+    uz.onfile = (entry) => {
+      if (entry.name.startsWith('__MACOSX') || !/\.(melarecipe|json)$/i.test(entry.name)) return; // non letto: saltato
+      const parts = [];
+      entry.ondata = (err, dat, final) => {
+        if (err) {
+          zipErr = err;
+          return;
+        }
+        if (dat && dat.length) parts.push(dat);
+        if (final) ready.push(concat(parts));
+      };
+      entry.start();
+    };
+    for (let o = 0; o < f.size; o += CHUNK) {
+      const piece = await readSlice(f, o, Math.min(f.size, o + CHUNK));
+      uz.push(piece, o + CHUNK >= f.size);
+      if (zipErr) throw new Error('Il file di Mela sembra rovinato: prova a esportarlo di nuovo.');
+      while (ready.length) await handle(ready.shift());
+    }
+  }
+  if (batch.length) await onBatch?.(batch);
+  return { total, bad };
 }
 
 // Un ingrediente di Mela ("# Per il sugo" è un titoletto) → cibo del catalogo

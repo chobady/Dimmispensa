@@ -15,7 +15,8 @@ export default function Recipes() {
   const { state, toast, warnDays } = useApp();
   const me = state.user?.name || '';
   const fileRef = useRef(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [photos, setPhotos] = useState(true);
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('tutte'); // tutte | ora | scadenza
   const [cat, setCat] = useState('');
@@ -44,19 +45,29 @@ export default function Recipes() {
     const files = [...(e.target.files || [])];
     e.target.value = '';
     if (!files.length) return;
-    setBusy(true);
+    setBusy('Apro il file...');
+    const known = new Set(recipes.map((r) => r.id));
+    let added = 0;
+    let saved = 0;
     try {
-      const list = await readMelaFiles(files, me);
-      if (!list.length) throw new Error('Non trovo ricette in questo file. Serve il file esportato da Mela (.melarecipe o .melarecipes).');
-      const isNew = list.filter((r) => !recipes.some((x) => x.id === r.id)).length;
-      await actions.recipesPut(list);
+      const { total } = await readMelaFiles(files, me, {
+        photos,
+        onStep: (n) => setBusy(`Leggo le ricette... ${n}`),
+        onBatch: async (list) => {
+          added += list.filter((r) => !known.has(r.id)).length;
+          await actions.recipesPut(list);
+          saved += list.length;
+        },
+      });
+      if (!total) throw new Error('Non trovo ricette in questo file. Serve il file esportato da Mela (.melarecipe o .melarecipes).');
       play('add');
-      toast(isNew === list.length ? `${list.length} ricette importate!` : `${isNew} ricette nuove, ${list.length - isNew} aggiornate.`);
+      toast(added === total ? `${total} ricette importate!` : `${added} ricette nuove, ${total - added} aggiornate.`);
     } catch (err) {
       play('error');
-      toast(err?.code === 'permission-denied' ? 'Firebase non mi fa salvare le ricette: aggiorna le regole (vedi sotto).' : err.message || 'Importazione non riuscita.', { err: true });
+      const msg = err?.code === 'permission-denied' ? 'Firebase non mi fa salvare le ricette: aggiorna le regole (vedi sotto).' : err.message || 'Importazione non riuscita.';
+      toast(saved ? `${msg} (${saved} ricette erano già state salvate.)` : msg, { err: true });
     } finally {
-      setBusy(false);
+      setBusy('');
     }
   };
 
@@ -89,15 +100,19 @@ export default function Recipes() {
             <li>Tocca Condividi → <b>Esporta</b>, poi salva il file in File (o su iCloud Drive).</li>
             <li>Torna qui e tocca il bottone sotto: scegli il file <b>.melarecipes</b>.</li>
           </ol>
-          <Btn color="yellow" block icon="1f4e6" onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? 'Leggo le ricette...' : 'Importa da Mela'}</Btn>
-          <p className="small muted">{cloudEnabled ? 'Le ricette restano condivise con chi usa la tua dispensa.' : 'Senza Firebase le ricette restano solo su questo dispositivo.'} Mela le tiene comunque lei: qui c'è una copia per confrontarle con la dispensa.</p>
+          <label className="opt-check small">
+            <input type="checkbox" checked={photos} onChange={(e) => setPhotos(e.target.checked)} /> Con le foto (solo una miniatura per ricetta)
+          </label>
+          <Btn color="yellow" block icon="1f4e6" onClick={() => fileRef.current?.click()} disabled={!!busy}>{busy || 'Importa da Mela'}</Btn>
+          <p className="small muted">{cloudEnabled ? 'Le ricette restano condivise con chi usa la tua dispensa.' : 'Senza Firebase le ricette restano solo su questo dispositivo.'} Le foto grandi restano in Mela: qui salvo solo il testo e una miniatura (pochi KB a ricetta), quindi anche centinaia di ricette occupano pochissimo.</p>
         </div>
       ) : (
         <>
           <div className="row" style={{ marginBottom: 8 }}>
             <input className="input grow" type="search" placeholder="Cerca: pollo, torta, pasta..." value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cerca tra le ricette" />
-            <Btn sm icon="1f4e6" onClick={() => fileRef.current?.click()} disabled={busy} aria-label="Importa altre ricette da Mela">{busy ? '...' : 'Importa'}</Btn>
+            <Btn sm icon="1f4e6" onClick={() => fileRef.current?.click()} disabled={!!busy} aria-label="Importa altre ricette da Mela">Importa</Btn>
           </div>
+          {busy && <p className="small center blink">{busy}</p>}
           <div className="chips" style={{ marginBottom: 8 }}>
             <button type="button" className={'chip ' + (filter === 'tutte' ? 'on' : '')} onClick={() => setFilter('tutte')}>Tutte ({recipes.length})</button>
             <button type="button" className={'chip ' + (filter === 'ora' ? 'on' : '')} onClick={() => setFilter('ora')}>Posso farle ora ({nNow})</button>
