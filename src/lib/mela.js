@@ -177,15 +177,19 @@ const VARIANTS = {
   farina: ['segale', 'orzo', 'avena', 'riso', 'mais', 'farro', 'ceci', 'castagn', 'mandorl', 'cocco', 'saraceno', 'integral', 'manitoba', 'semol', 'kamut', 'tapioca', 'patat', 'lenticch', 'nocciol', 'quinoa', 'amaranto', 'miglio', 'fecola', 'maizena', 'amido', 'duro', 'piselli', 'pistacch', 'carrub', 'canapa', 'teff', 'sorgo'],
   latte: ['soia', 'avena', 'riso', 'mandorl', 'cocco', 'condensat', 'polvere', 'capra', 'pecora', 'nocciol'],
   zucchero: ['canna', 'velo', 'muscovado', 'grezzo', 'cocco'],
+  spezie: ['anice', 'cannella', 'curcuma', 'moscata', 'paprika', 'cumino', 'curry', 'zafferano', 'garofano', 'vaniglia', 'cardamomo', 'ginepro', 'macis', 'pimento', 'sumac', 'masala', 'hanout', 'fieno greco', 'coriandolo', 'carvi', 'senape', 'liquirizia', 'tonka', 'affumicat'],
   erbe: ['basilic', 'prezzemol', 'timo', 'rosmarin', 'salvia', 'origano', 'menta', 'mentuccia', 'maggiorana', 'alloro', 'cipollina', 'aneto', 'dragoncello', 'coriandol', 'finocchiett', 'cerfoglio', 'nepitella', 'santoreggia', 'melissa', 'citronella', 'lemongrass', 'shiso'],
   riso: ['venere', 'nero', 'rosso', 'basmati', 'jasmine', 'integral', 'selvaggio', 'glutinoso', 'sushi'],
 };
 const variantsIn = (key, text) => (VARIANTS[key] || []).filter((v) => text.includes(v));
 // per questi, una riga generica ("erbe aromatiche") va bene con qualunque tipo
-const GENERIC_ANY = new Set(['erbe']);
+const GENERIC_ANY = new Set(['erbe', 'spezie']);
 
 // Ingredienti che non sono nel catalogo (anguilla, tahina...): li cerco per nome nella dispensa
 const STOP = new Set('circa pronta pronto cottura fresco fresca freschi fresche grande grandi piccolo piccola piccoli medio media medie tritato tritata tritati grattugiato grattugiata pulito pulita puliti tagliato tagliata foglie foglia rametti rametto spicchi spicchio cucchiai cucchiaio cucchiaini cucchiaino bicchiere bicchieri tazza tazze pizzico pizzichi mazzetto mazzetti qualche alcune alcuni litro litri grammi quanto basta della delle dello degli dalla nella sulla oppure altro altra intero intera interi tipo pezzo pezzi fetta fette scatola barattolo confezione vasetto ciuffo manciata busta'.split(' '));
+// stessa parola, anche al plurale (mela/mele, uovo/uova)
+const stem = (w) => w.replace(/[aeiou]$/, '');
+const sameWord = (a, b) => a === b || (stem(a).length >= 4 && stem(a) === stem(b));
 export const ingredientWords = (line) => norm(line).replace(/[^a-z ]/g, ' ').split(' ').filter((w) => w.length > 3 && !STOP.has(w));
 // "1 anguilla di 1 kg pronta per la cottura" → "anguilla"
 export const cleanIngredient = (line) =>
@@ -201,11 +205,15 @@ export const cleanIngredient = (line) =>
 export function parseIngredient(line, key) {
   if (key === '#' || /^#/.test(line)) return { line: line.replace(/^#+\s*/, ''), header: true };
   const clean = line.replace(/^[-•*]\s*/, '');
-  let food = key !== undefined ? (key ? BY_KEY[key] || null : null) : matchFood(clean);
+  // chiave salvata all'import; se allora non era riconosciuto riprovo (il catalogo nel frattempo può essere cresciuto)
+  let food = (key ? BY_KEY[key] : null) || matchFood(clean) || null;
   // "aceto di vino" è aceto, non vino
   if (/\baceto\b/i.test(clean) && BY_KEY.aceto) food = BY_KEY.aceto;
   const junk = (clean.match(/[a-zà-ú]/gi) || []).length < 3; // righe tipo "1" rimaste dall'export
-  return { line: clean, food: food || null, basic: !!(food && BASICS.has(food.key)), variant: food ? variantsIn(food.key, norm(clean)) : [], junk };
+  const variant = food ? variantsIn(food.key, norm(clean)) : [];
+  // le spezie in generale le hai, ma l'anice o lo zafferano vanno comprati apposta
+  const basic = !!(food && BASICS.has(food.key) && !(food.key === 'spezie' && variant.length));
+  return { line: clean, food: food || null, basic, variant, junk };
 }
 
 // righe già analizzate, per non rifare il riconoscimento a ogni aggiornamento (con migliaia di ricette conta)
@@ -230,7 +238,9 @@ export function pantryIndex(items, soonIds = new Set()) {
     if (!byFood.has(it.food)) byFood.set(it.food, []);
     byFood.get(it.food).push(it);
   }
-  return { byFood, names: items.map((it) => ({ it, n: norm(it.name) })), soonIds, byName: new Map(), byVariant: new Map() };
+  // per nome cerco solo tra i cibi fuori catalogo: "Tisana zenzero" (che è un tè) non è zenzero
+  const names = items.filter((it) => !it.food || it.food === 'altro').map((it) => ({ it, n: norm(it.name), w: norm(it.name).replace(/[^a-z ]/g, ' ').split(' ').filter((x) => x.length > 3) }));
+  return { byFood, names, soonIds, byName: new Map(), byVariant: new Map() };
 }
 
 // Confronto con la dispensa: cosa hai, cosa manca, quali cibi in scadenza usa
@@ -245,7 +255,7 @@ export function checkRecipe(recipe, idx) {
     if (!r.food) {
       // non nel catalogo: ce l'hai se un cibo della dispensa ha una parola importante in comune
       const words = ingredientWords(r.line);
-      r.items = words.length ? idx.names.filter((x) => words.some((w) => x.n.split(' ').some((n) => n.length > 3 && (n.startsWith(w.slice(0, -1)) || w.startsWith(n.slice(0, -1)))))).map((x) => x.it) : [];
+      r.items = words.length ? idx.names.filter((x) => words.some((w) => x.w.some((n) => sameWord(n, w)))).map((x) => x.it) : [];
       r.have = r.items.length > 0;
       r.unknown = true;
       if (!words.length) {
@@ -274,7 +284,7 @@ export function checkRecipe(recipe, idx) {
     if (!found.length && !VARIANTS[r.food.key]) {
       // per i cibi fuori catalogo: nome uguale
       const w = norm(r.food.name).split(' ')[0];
-      if (!idx.byName.has(w)) idx.byName.set(w, idx.names.filter((x) => w.length > 3 && x.n.includes(w)).map((x) => x.it));
+      if (!idx.byName.has(w)) idx.byName.set(w, idx.names.filter((x) => w.length > 3 && x.w.some((n) => sameWord(n, w))).map((x) => x.it));
       found = idx.byName.get(w);
     }
     r.have = found.length > 0;

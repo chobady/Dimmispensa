@@ -162,7 +162,7 @@ const ROWS = [
   ['sale', 'Sale', '1f9c2', 'dispensa', 'D', 3650, 'conf', 'sale grosso|sale fino'],
   ['pepe', 'Pepe', 'pepe', 'dispensa', 'D', 730, 'pz', ''],
   ['zucchero', 'Zucchero', 'zucchero', 'dispensa', 'D', 1095, 'g', 'zucchero di canna|dolcificante'],
-  ['spezie', 'Spezie', 'spezie', 'dispensa', 'D', 365, 'pz', 'origano|paprika|curry|curcuma|cannella|noce moscata|cumino'],
+  ['spezie', 'Spezie', 'spezie', 'dispensa', 'D', 365, 'pz', 'origano|paprika|curry|curcuma|cannella|noce moscata|cumino|anice|anice stellato|zafferano|chiodi di garofano|vaniglia|bacca di vaniglia|cardamomo|ginepro|bacche di ginepro|macis|pimento|sumac|garam masala|cinque spezie|semi di cumino|carvi'],
   ['dado', 'Dado e lievito', 'dado', 'dispensa', 'D', 365, 'conf', 'dado|dadi|lievito|bicarbonato'],
   ['brodo', 'Brodo pronto', 'brodo', 'dispensa', 'D', 365, 'l', 'brodo'],
   ['pesto', 'Pesto', 'pesto', 'dispensa', 'F', 30, 'pz', 'pesto alla genovese'],
