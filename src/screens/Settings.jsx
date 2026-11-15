@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { currentSubscription, disablePush, enablePush, pushSupport, testPush } from '../lib/push.js';
 import { actions, cloudEnabled, friendlyError, prettyCode } from '../lib/store.js';
-import { forgetModel, GeminiError, testKey } from '../lib/gemini.js';
+import { forgetModel, geminiStatus, GeminiError, testKey } from '../lib/gemini.js';
 import { fillNutrition } from '../lib/nutrition.js';
 import { CIQUAL } from '../ciqual-data.js';
 import { play, setSound, soundOn } from '../lib/sound.js';
@@ -13,6 +13,7 @@ export default function Settings() {
   const [key, setKey] = useState(pantry.geminiKey || '');
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [gStatus, setGStatus] = useState(geminiStatus);
   const [sound, setSnd] = useState(soundOn());
   const [pname, setPname] = useState(pantry.name || '');
   const [sureLeave, setSureLeave] = useState(false);
@@ -63,6 +64,7 @@ export default function Settings() {
       toast(e instanceof GeminiError ? e.message : friendlyError(e), { err: true });
     } finally {
       setTesting(false);
+      setGStatus(geminiStatus());
     }
   };
 
@@ -123,6 +125,7 @@ export default function Settings() {
           <Btn color="green" disabled={testing || key.trim() === (pantry.geminiKey || '')} onClick={() => saveKey(false)}>Salva</Btn>
           <Btn color="blue" disabled={testing || !key.trim()} onClick={() => saveKey(true)}>{testing ? 'Provo...' : 'Salva e prova'}</Btn>
         </div>
+        {pantry.geminiKey && <GeminiState s={gStatus} />}
         {pantry.geminiKey && (
           <div className="stack" style={{ gap: 6 }}>
             <p className="small">
@@ -287,5 +290,28 @@ function NotifyBox() {
         })}>Attiva le notifiche</Btn>
       )}
     </div>
+  );
+}
+
+// Stato delle richieste gratuite di Gemini, dall'ultima volta che l'app l'ha usato
+function GeminiState({ s }) {
+  const t = (ms) => new Date(ms).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  const day = (ms) => (new Date(ms).toDateString() === new Date().toDateString() ? 'oggi' : new Date(ms).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }));
+  let text = 'Non ancora usato su questo dispositivo: tocca "Salva e prova" per controllare.';
+  let cls = '';
+  if (s?.kind === 'day' && s.reset > Date.now()) {
+    text = `⛔ Richieste gratuite di oggi finite (${day(s.at)} alle ${t(s.at)}). Si ricaricano verso le ${t(s.reset)}.`;
+    cls = 'bad';
+  } else if (s?.kind === 'minute' && Date.now() - s.at < 5 * 60000) {
+    text = `⏳ Troppe richieste in poco tempo (alle ${t(s.at)}): basta aspettare un minuto.`;
+    cls = 'warn';
+  } else if (s?.kind === 'ok' || s?.kind === 'day' || s?.kind === 'minute') {
+    text = s.kind === 'ok' ? `✅ Funziona: ultima risposta ${day(s.at)} alle ${t(s.at)}.` : '✅ Le richieste dovrebbero essersi ricaricate: tocca "Salva e prova" per controllare.';
+    cls = 'ok';
+  }
+  return (
+    <p className={'small gemini-state ' + cls} role="status">
+      {text}
+    </p>
   );
 }

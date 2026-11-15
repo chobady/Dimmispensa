@@ -636,3 +636,7 @@ body.no-scroll { overflow: hidden; }
 .pick.on { background-color: var(--yellow); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .saved-star { color: #d08a00; }
+.gemini-state { padding: 6px 8px; box-shadow: 0 0 0 2px var(--ink); background: var(--white); }
+.gemini-state.ok { background: #e6f4d8; }
+.gemini-state.warn { background: #fff1c2; }
+.gemini-state.bad { background: #fbe0dc; }

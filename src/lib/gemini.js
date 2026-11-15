@@ -43,12 +43,48 @@ async function discoverModel(key) {
   return ok[0];
 }
 
+// ---- stato delle richieste gratuite (per mostrarlo nelle Opzioni) ----
+const LS_STATUS = 'dm_gemini_status';
+export function geminiStatus() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_STATUS) || 'null');
+  } catch {
+    return null;
+  }
+}
+const setStatus = (kind, extra = {}) => {
+  try {
+    localStorage.setItem(LS_STATUS, JSON.stringify({ kind, at: Date.now(), ...extra }));
+  } catch {}
+};
+// le richieste gratuite di Gemini si ricaricano a mezzanotte in California
+export function quotaResetAt(now = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(now).map((x) => [x.type, x.value]));
+  const mins = 24 * 60 - (Number(p.hour) * 60 + Number(p.minute));
+  return new Date(now.getTime() + mins * 60000);
+}
+const hhmm = (d) => d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+
 async function toError(r) {
   let msg = '';
+  let body = null;
   try {
-    msg = (await r.json())?.error?.message || '';
+    body = await r.json();
+    msg = body?.error?.message || '';
   } catch {}
-  if (r.status === 429) return new GeminiError('Gemini ha finito le richieste gratuite per ora. Riprova tra un minuto.', 'quota');
+  if (r.status === 429) {
+    const details = body?.error?.details || [];
+    const ids = details.flatMap((d) => (d.violations || []).map((v) => String(v.quotaId || v.quotaMetric || ''))).join(' ');
+    const retry = details.map((d) => d.retryDelay).find(Boolean);
+    const secs = retry ? Math.ceil(parseFloat(retry)) : 0;
+    if (/per ?day/i.test(ids) || /per day|daily/i.test(msg)) {
+      const at = quotaResetAt();
+      setStatus('day', { reset: at.getTime() });
+      return new GeminiError(`Gemini ha finito le richieste gratuite di oggi. Si ricaricano verso le ${hhmm(at)}.`, 'quota-day');
+    }
+    setStatus('minute');
+    return new GeminiError(`Troppe richieste a Gemini in poco tempo: riprova tra ${secs > 0 && secs < 600 ? secs + ' secondi' : 'un minuto'}.`, 'quota');
+  }
   if (r.status === 400 && /api key/i.test(msg)) return new GeminiError('La chiave Gemini non è valida. Controllala nelle Opzioni.', 'key');
   if (r.status === 401 || r.status === 403) return new GeminiError('La chiave Gemini non è valida o non è attiva. Controllala nelle Opzioni.', 'key');
   if (r.status === 404) return new GeminiError('Modello Gemini non trovato.', 'notfound');
@@ -124,10 +160,12 @@ async function generate(key, parts, schema = SCHEMA, search = false) {
         else throw e;
       }
       saveModel(model);
+      setStatus('ok', { model });
       return text;
     } catch (e) {
       lastErr = e;
-      if (e.code !== 'notfound' && e.code !== 'http400') throw e;
+      // finite le richieste di oggi su questo modello: provo il successivo (ognuno ha le sue)
+      if (e.code !== 'notfound' && e.code !== 'http400' && e.code !== 'quota-day') throw e;
     }
   }
   throw lastErr || new GeminiError('Gemini non disponibile.', 'unknown');
