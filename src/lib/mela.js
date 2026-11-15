@@ -201,6 +201,41 @@ export const cleanIngredient = (line) =>
     .trim()
     .slice(0, 50);
 
+// ---- tipo preciso dentro un gruppo del catalogo ----
+// Il catalogo raggruppa (Pesce = nasello, orata, merluzzo...; Formaggio = pecorino, brie...).
+// Se la ricetta chiede un tipo preciso (nasello), serve in dispensa un cibo con quel nome;
+// se chiede il gruppo in generale ("pesce", "formaggio"), va bene qualunque cibo del gruppo.
+const kstem = (w) => (w.length > 4 ? w.replace(/[aeio]$/, '') : w);
+const hasKw = (t, kw) => t.includes(' ' + kw + ' ') || (kw.length >= 4 && t.includes(' ' + kstem(kw)));
+const genericCache = new Map();
+function genericKws(food) {
+  let g = genericCache.get(food.key);
+  if (!g) {
+    const base = [food.kws[0], food.kws[1]].filter(Boolean);
+    const stems = new Set(base.flatMap((b) => [kstem(b), ...b.split(' ').filter((w) => w.length > 2 && !['di', 'del', 'della', 'con'].includes(w)).map(kstem)]));
+    g = new Set([...base, ...food.kws.filter((k) => stems.has(kstem(k)))]);
+    genericCache.set(food.key, g);
+  }
+  return g;
+}
+// parole che descrivono la forma, non il tipo: "filetti di pesce" resta pesce in generale
+const FORM = new Set('filetti filetto tranci trancio fette fetta fettine polpa pezzi pezzo cubetti dadini bocconcini cuori di del della dello dei degli delle d grattugiato grattugiata grattugiati fresco fresca freschi fresche secco secca secchi intero intera interi macinato macinata tritato tritata a'.split(' '));
+function isGeneric(food, kw) {
+  if (!kw) return true;
+  const g = genericKws(food);
+  if (g.has(kw)) return true;
+  const gs = new Set([...g].map(kstem));
+  return kw.split(' ').every((w) => FORM.has(w) || gs.has(kstem(w)));
+}
+
+// la parola del gruppo che compare nella riga (la più lunga/specifica)
+function kwIn(food, text) {
+  const t = ' ' + norm(text) + ' ';
+  let best = '';
+  for (const kw of food.kws) if (kw.length > best.length && hasKw(t, kw)) best = kw;
+  return best;
+}
+
 // Un ingrediente di Mela ("# Per il sugo" è un titoletto) → cibo del catalogo
 export function parseIngredient(line, key) {
   if (key === '#' || /^#/.test(line)) return { line: line.replace(/^#+\s*/, ''), header: true };
@@ -211,9 +246,11 @@ export function parseIngredient(line, key) {
   if (/\baceto\b/i.test(clean) && BY_KEY.aceto) food = BY_KEY.aceto;
   const junk = (clean.match(/[a-zà-ú]/gi) || []).length < 3; // righe tipo "1" rimaste dall'export
   const variant = food ? variantsIn(food.key, norm(clean)) : [];
+  const kw = food ? kwIn(food, clean) : '';
+  const generic = !food || isGeneric(food, kw);
   // le spezie in generale le hai, ma l'anice o lo zafferano vanno comprati apposta
   const basic = !!(food && BASICS.has(food.key) && !(food.key === 'spezie' && variant.length));
-  return { line: clean, food: food || null, basic, variant, junk };
+  return { line: clean, food: food || null, basic, variant, junk, kw, generic };
 }
 
 // righe già analizzate, per non rifare il riconoscimento a ogni aggiornamento (con migliaia di ricette conta)
@@ -249,7 +286,7 @@ export function pantryIndex(items, soonIds = new Set()) {
   }
   // per nome cerco solo tra i cibi fuori catalogo: "Tisana zenzero" (che è un tè) non è zenzero
   const names = items.filter((it) => !it.food || it.food === 'altro').map((it) => ({ it, n: norm(it.name), w: norm(it.name).replace(/[^a-z ]/g, ' ').split(' ').filter((x) => x.length > 3) }));
-  return { byFood, names, soonIds, byName: new Map(), byVariant: new Map() };
+  return { byFood, names, soonIds, byName: new Map(), byVariant: new Map(), byKind: new Map() };
 }
 
 // Confronto con la dispensa: cosa hai, cosa manca, quali cibi in scadenza usa
@@ -291,6 +328,12 @@ export function checkRecipe(recipe, idx) {
         );
       }
       found = idx.byVariant.get(k);
+    }
+    if (!r.generic && found.length) {
+      // tipo preciso: il nome del cibo in dispensa deve contenerlo (nasello ≠ orata)
+      const k = `${r.food.key}#${r.kw}`;
+      if (!idx.byKind.has(k)) idx.byKind.set(k, found.filter((it) => hasKw(' ' + norm(it.name) + ' ', r.kw)));
+      found = idx.byKind.get(k);
     }
     found = found.filter((it) => fits(it, ln));
     if (!found.length && !VARIANTS[r.food.key]) {
