@@ -65,7 +65,8 @@ const ROWS = [
   ['melaverde', 'Mele verdi', '1f34f', 'frutta', 'F', 21, 'pz', 'mela verde|granny'],
   ['pera', 'Pere', '1f350', 'frutta', 'F', 10, 'pz', 'pere'],
   ['banana', 'Banane', '1f34c', 'frutta', 'D', 5, 'pz', 'banane'],
-  ['arancia', 'Arance', '1f34a', 'frutta', 'F', 14, 'pz', 'arance|mandarino|mandarini|clementine|clementina|mandaranci'],
+  ['arancia', 'Arance', '1f34a', 'frutta', 'F', 14, 'pz', 'arance|arancia rossa|tarocco|navel'],
+  ['mandarino', 'Mandarini', 'mandarino', 'frutta', 'F', 10, 'pz', 'mandarini|mandarino|clementine|clementina|clementini|mandaranci|mandarancio|tardivo|satsuma'],
   ['limone', 'Limoni', '1f34b', 'frutta', 'F', 21, 'pz', 'lime'],
   ['fragola', 'Fragole', '1f353', 'frutta', 'F', 3, 'g', 'fragole|lamponi|lampone'],
   ['ciliegia', 'Ciliegie', '1f352', 'frutta', 'F', 5, 'g', 'ciliegie|amarene'],
@@ -326,7 +327,8 @@ const EN_KW = {
   melaverde: 'green apple|green apples|granny smith',
   pera: 'pear|pears',
   banana: 'banana|bananas',
-  arancia: 'orange|oranges|mandarin|tangerine|clementine|clementines',
+  arancia: 'orange|oranges|blood orange',
+  mandarino: 'mandarin|mandarins|tangerine|tangerines|clementine|clementines|satsuma',
   limone: 'lemon|lemons|lime|limes',
   fragola: 'strawberry|strawberries|raspberries',
   ciliegia: 'cherry|cherries',
@@ -485,7 +487,7 @@ export const macroOf = (item) => (item.macro !== undefined && item.macro !== '' 
 
 // Peso medio di un pezzo (g o ml): serve per pesare nei pasti i cibi contati a pezzi
 export const PIECE_G = {
-  uova: 60, mela: 180, melaverde: 180, pera: 170, banana: 120, arancia: 150, limone: 100, kiwi: 75, kaki: 200, pesca: 150, prugna: 60, fico: 50,
+  uova: 60, mela: 180, melaverde: 180, pera: 170, banana: 120, arancia: 150, mandarino: 80, limone: 100, kiwi: 75, kaki: 200, pesca: 150, prugna: 60, fico: 50,
   avocado: 170, pomodoro: 120, zucchina: 200, melanzana: 300, peperone: 160, cetriolo: 300, cipolla: 120, carota: 80, patatadolce: 200,
   finocchio: 250, carciofo: 150, sedano: 400, porro: 200, cavolfiore: 600, broccoli: 400, radicchio: 250, ananas: 1000, melone: 1200,
   mango: 300, cocco: 500, mozzarella: 125, yogurt: 125, budino: 100, formaggio: 200, burro: 250, parmigiano: 300, salame: 200,
