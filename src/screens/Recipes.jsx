@@ -68,9 +68,11 @@ export default function Recipes() {
     .filter(({ r }) => !cat || (r.categories || []).includes(cat))
     .filter(({ c }) => filter !== 'ora' || (c.need > 0 && c.missing.length === 0))
     .filter(({ c }) => filter !== 'scadenza' || c.usesSoon.length > 0)
+    .filter(({ r }) => filter !== 'salvate' || r.saved)
     .sort(SORTS[sort].fn);
   const nNow = checked.filter(({ c }) => c.need > 0 && !c.missing.length).length;
   const nSoon = checked.filter(({ c }) => c.usesSoon.length).length;
+  const nSaved = recipes.filter((r) => r.saved).length;
 
   const onFiles = async (e) => {
     const files = [...(e.target.files || [])];
@@ -158,6 +160,7 @@ export default function Recipes() {
             <button type="button" className={'chip ' + (filter === 'tutte' ? 'on' : '')} onClick={() => setFilter('tutte')}>Tutte ({recipes.length})</button>
             <button type="button" className={'chip ' + (filter === 'ora' ? 'on' : '')} onClick={() => setFilter('ora')}>Posso farle ora ({nNow})</button>
             <button type="button" className={'chip ' + (filter === 'scadenza' ? 'on' : '')} onClick={() => setFilter('scadenza')}>Usano cibi in scadenza ({nSoon})</button>
+            <button type="button" className={'chip ' + (filter === 'salvate' ? 'on' : '')} onClick={() => setFilter('salvate')}>★ Salvate ({nSaved})</button>
           </div>
           {cats.length > 1 && (
             <label className="pick-wrap">
@@ -188,7 +191,10 @@ export default function Recipes() {
               <button key={r.id} type="button" className="win flat recipe-card" onClick={() => setOpenId(r.id)}>
                 {r.img ? <img src={r.img} alt="" className="recipe-img" loading="lazy" decoding="async" /> : <span className="recipe-img ph"><Icon id="1f372" size={34} /></span>}
                 <span className="grow">
-                  <span className="nm">{r.title}</span>
+                  <span className="nm">
+                    {r.saved && <span className="saved-star" aria-label="Salvata">★ </span>}
+                    {r.title}
+                  </span>
                   <span className="have-bar" aria-hidden="true">
                     <span style={{ width: `${Math.round(c.ratio * 100)}%` }} />
                   </span>
@@ -205,7 +211,7 @@ export default function Recipes() {
           {shown.length > limit && (
             <Btn block style={{ marginTop: 12 }} onClick={() => setLimit(limit + 40)}>Mostra altre ({shown.length - limit})</Btn>
           )}
-          {!shown.length && <p className="muted center" style={{ marginTop: 14 }}>Nessuna ricetta corrisponde.</p>}
+          {!shown.length && <p className="muted center" style={{ marginTop: 14 }}>{filter === 'salvate' && !nSaved ? 'Nessuna ricetta salvata: aprine una e tocca ☆ Salva per dopo.' : 'Nessuna ricetta corrisponde.'}</p>}
         </>
       )}
 
@@ -267,6 +273,18 @@ function RecipeSheet({ r, c, onClose }) {
       <div className="stack">
         {r.img && <img src={r.img} alt="" className="recipe-hero" />}
         {times.length > 0 && <p className="small muted">{times.join(' · ')}</p>}
+        <Btn
+          block
+          color={r.saved ? 'yellow' : undefined}
+          aria-pressed={!!r.saved}
+          onClick={() => {
+            actions.recipeUpdate(r.id, { saved: !r.saved, savedAt: r.saved ? null : Date.now() }).catch((e) => toast(e.message || 'Non riesco a salvarla.', { err: true }));
+            play(r.saved ? 'tap' : 'add');
+            toast(r.saved ? `${r.title}: tolta dalle salvate.` : `${r.title}: salvata per dopo. La trovi in ★ Salvate.`);
+          }}
+        >
+          {r.saved ? '★ Salvata (tocca per togliere)' : '☆ Salva per dopo'}
+        </Btn>
         <div className="two">
           {mela ? (
             <a className="btn sm" href={mela}>

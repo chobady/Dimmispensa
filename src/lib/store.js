@@ -97,9 +97,15 @@ const local = {
     set({ items });
   },
   async recipesPut(list) {
+    const old = new Map(state.recipes.map((r) => [r.id, r]));
     const ids = new Set(list.map((r) => r.id));
-    const next = [...state.recipes.filter((r) => !ids.has(r.id)), ...list];
+    const next = [...state.recipes.filter((r) => !ids.has(r.id)), ...list.map((r) => ({ ...old.get(r.id), ...r }))];
     if (!lsSet('dm_recipes', next)) throw new Error('Spazio finito sul dispositivo: senza Firebase le ricette con foto occupano troppo.');
+    set({ recipes: next });
+  },
+  async recipeUpdate(id, patch) {
+    const next = state.recipes.map((r) => (r.id === id ? { ...r, ...patch } : r));
+    lsSet('dm_recipes', next);
     set({ recipes: next });
   },
   async recipeRemove(id) {
@@ -320,9 +326,15 @@ const cloud = {
     const pid = state.pantry.id;
     for (let i = 0; i < list.length; i += 200) {
       const batch = F.writeBatch(db);
-      list.slice(i, i + 200).forEach((r) => batch.set(F.doc(db, 'pantries', pid, 'recipes', r.id), r));
+      // merge: reimportando non si perde la stellina "salvata"
+      list.slice(i, i + 200).forEach((r) => batch.set(F.doc(db, 'pantries', pid, 'recipes', r.id), r, { merge: true }));
       await batch.commit();
     }
+  },
+  async recipeUpdate(id, patch) {
+    const { db, F } = fb;
+    set({ recipes: state.recipes.map((r) => (r.id === id ? { ...r, ...patch } : r)) });
+    await F.setDoc(F.doc(db, 'pantries', state.pantry.id, 'recipes', id), patch, { merge: true });
   },
   async recipeRemove(id) {
     const { db, F } = fb;
@@ -513,6 +525,7 @@ export const actions = {
   renamePantry: cloud.renamePantry,
   recipesPut: (list) => impl.recipesPut(list),
   recipeRemove: (id) => impl.recipeRemove(id),
+  recipeUpdate: (id, patch) => impl.recipeUpdate(id, patch),
   savePush: cloud.savePush,
   removePush: cloud.removePush,
   setNotifyDays: cloud.setNotifyDays,
