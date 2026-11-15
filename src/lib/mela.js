@@ -177,16 +177,35 @@ const VARIANTS = {
   farina: ['segale', 'orzo', 'avena', 'riso', 'mais', 'farro', 'ceci', 'castagn', 'mandorl', 'cocco', 'saraceno', 'integral', 'manitoba', 'semol', 'kamut', 'tapioca', 'patat', 'lenticch', 'nocciol', 'quinoa', 'amaranto', 'miglio', 'fecola', 'maizena', 'amido', 'duro', 'piselli', 'pistacch', 'carrub', 'canapa', 'teff', 'sorgo'],
   latte: ['soia', 'avena', 'riso', 'mandorl', 'cocco', 'condensat', 'polvere', 'capra', 'pecora', 'nocciol'],
   zucchero: ['canna', 'velo', 'muscovado', 'grezzo', 'cocco'],
+  erbe: ['basilic', 'prezzemol', 'timo', 'rosmarin', 'salvia', 'origano', 'menta', 'mentuccia', 'maggiorana', 'alloro', 'cipollina', 'aneto', 'dragoncello', 'coriandol', 'finocchiett', 'cerfoglio', 'nepitella', 'santoreggia', 'melissa', 'citronella', 'lemongrass', 'shiso'],
   riso: ['venere', 'nero', 'rosso', 'basmati', 'jasmine', 'integral', 'selvaggio', 'glutinoso', 'sushi'],
 };
 const variantsIn = (key, text) => (VARIANTS[key] || []).filter((v) => text.includes(v));
+// per questi, una riga generica ("erbe aromatiche") va bene con qualunque tipo
+const GENERIC_ANY = new Set(['erbe']);
+
+// Ingredienti che non sono nel catalogo (anguilla, tahina...): li cerco per nome nella dispensa
+const STOP = new Set('circa pronta pronto cottura fresco fresca freschi fresche grande grandi piccolo piccola piccoli medio media medie tritato tritata tritati grattugiato grattugiata pulito pulita puliti tagliato tagliata foglie foglia rametti rametto spicchi spicchio cucchiai cucchiaio cucchiaini cucchiaino bicchiere bicchieri tazza tazze pizzico pizzichi mazzetto mazzetti qualche alcune alcuni litro litri grammi quanto basta della delle dello degli dalla nella sulla oppure altro altra intero intera interi tipo pezzo pezzi fetta fette scatola barattolo confezione vasetto ciuffo manciata busta'.split(' '));
+export const ingredientWords = (line) => norm(line).replace(/[^a-z ]/g, ' ').split(' ').filter((w) => w.length > 3 && !STOP.has(w));
+// "1 anguilla di 1 kg pronta per la cottura" → "anguilla"
+export const cleanIngredient = (line) =>
+  line
+    .replace(/^[\d\s.,/½¼¾-]+(kg|g|gr|ml|cl|dl|l|lt|cucchia\w*|bicchier\w*|tazz\w*|pizzic\w*|spicch\w*|ramett\w*|foglie|fette|pezz\w*|confezion\w*|scatol\w*|vasett\w*|mazzett\w*|bustin\w*|manciat\w*)?\.?\s+(di\s+|d['’]\s*)?/i, '')
+    .replace(/\s+(di|da)\s+\d.*$/i, '')
+    .replace(/\s+q\.?\s*b\.?.*$/i, '')
+    .replace(/,.*$/, '')
+    .trim()
+    .slice(0, 50);
 
 // Un ingrediente di Mela ("# Per il sugo" è un titoletto) → cibo del catalogo
 export function parseIngredient(line, key) {
   if (key === '#' || /^#/.test(line)) return { line: line.replace(/^#+\s*/, ''), header: true };
   const clean = line.replace(/^[-•*]\s*/, '');
-  const food = key !== undefined ? (key ? BY_KEY[key] || null : null) : matchFood(clean);
-  return { line: clean, food: food || null, basic: !!(food && BASICS.has(food.key)), variant: food ? variantsIn(food.key, norm(clean)) : [] };
+  let food = key !== undefined ? (key ? BY_KEY[key] || null : null) : matchFood(clean);
+  // "aceto di vino" è aceto, non vino
+  if (/\baceto\b/i.test(clean) && BY_KEY.aceto) food = BY_KEY.aceto;
+  const junk = (clean.match(/[a-zà-ú]/gi) || []).length < 3; // righe tipo "1" rimaste dall'export
+  return { line: clean, food: food || null, basic: !!(food && BASICS.has(food.key)), variant: food ? variantsIn(food.key, norm(clean)) : [], junk };
 }
 
 // righe già analizzate, per non rifare il riconoscimento a ogni aggiornamento (con migliaia di ricette conta)
@@ -222,7 +241,22 @@ export function checkRecipe(recipe, idx) {
   const missing = [];
   const usesSoon = [];
   for (const r of rows) {
-    if (r.header || !r.food) continue;
+    if (r.header || r.junk) continue;
+    if (!r.food) {
+      // non nel catalogo: ce l'hai se un cibo della dispensa ha una parola importante in comune
+      const words = ingredientWords(r.line);
+      r.items = words.length ? idx.names.filter((x) => words.some((w) => x.n.split(' ').some((n) => n.length > 3 && (n.startsWith(w.slice(0, -1)) || w.startsWith(n.slice(0, -1)))))).map((x) => x.it) : [];
+      r.have = r.items.length > 0;
+      r.unknown = true;
+      if (!words.length) {
+        r.skip = true;
+        continue;
+      }
+      need++;
+      if (r.have) have++;
+      else missing.push(r);
+      continue;
+    }
     let found = idx.byFood.get(r.food.key) || [];
     if (VARIANTS[r.food.key] && found.length) {
       const k = `${r.food.key}|${r.variant.join(',')}`;
@@ -231,7 +265,7 @@ export function checkRecipe(recipe, idx) {
           k,
           found.filter((it) => {
             const has = variantsIn(r.food.key, norm(it.name));
-            return r.variant.length ? r.variant.some((v) => has.includes(v)) : !has.length;
+            return r.variant.length ? r.variant.some((v) => has.includes(v)) : GENERIC_ANY.has(r.food.key) || !has.length;
           })
         );
       }

@@ -3,7 +3,7 @@ import { norm } from '../catalog.js';
 import { actions, cloudEnabled } from '../lib/store.js';
 import { addDays, expiryLabel, expiryStatus, fromISO } from '../lib/dates.js';
 import { newId } from '../lib/items.js';
-import { checkRecipe, melaLink, pantryIndex, readMelaFiles } from '../lib/mela.js';
+import { checkRecipe, cleanIngredient, melaLink, pantryIndex, readMelaFiles } from '../lib/mela.js';
 import { play } from '../lib/sound.js';
 import { Btn, Icon, SectionTitle, Sheet, Talk, useApp } from '../components/ui.jsx';
 import { SLOTS } from './Meals.jsx';
@@ -223,16 +223,19 @@ function RecipeSheet({ r, c, onClose }) {
   const times = [r.prepTime && `prep. ${r.prepTime}`, r.cookTime && `cottura ${r.cookTime}`, !r.prepTime && !r.cookTime && r.totalTime && r.totalTime, r.yield].filter(Boolean);
 
   const listKeys = new Set(Object.values(state.shopping || {}).filter((s) => !s.done).map(keyOf));
-  const toBuy = c.missing.filter((m) => !listKeys.has(m.food.key));
+  const buyKey = (m) => (m.food ? m.food.key : norm(cleanIngredient(m.line)));
+  const toBuy = c.missing.filter((m) => !listKeys.has(buyKey(m)));
   const addMissing = () => {
     const now = Date.now();
     const seen = new Set();
     const pairs = [];
     toBuy.forEach((m, i) => {
-      if (seen.has(m.food.key)) return;
-      seen.add(m.food.key);
+      const k = buyKey(m);
+      if (seen.has(k)) return;
+      seen.add(k);
       const id = newId();
-      pairs.push([id, { id, name: m.food.name, qty: null, unit: null, food: m.food.key, icon: m.food.icon, cat: m.food.cat, done: false, by: me, addedAt: now + i, note: r.title.slice(0, 60) }]);
+      const name = m.food ? m.food.name : cleanIngredient(m.line).replace(/^\w/, (ch) => ch.toUpperCase());
+      pairs.push([id, { id, name, qty: null, unit: null, food: m.food ? m.food.key : 'altro', icon: m.food ? m.food.icon : '1f4e6', cat: m.food ? m.food.cat : 'dispensa', done: false, by: me, addedAt: now + i, note: r.title.slice(0, 60) }]);
     });
     actions.shopSetMany(pairs);
     play('add');
@@ -300,8 +303,8 @@ function RecipeSheet({ r, c, onClose }) {
             row.header ? (
               <li key={i} className="ingr-h">{row.line}</li>
             ) : (
-              <li key={i} className={row.food ? (row.have ? 'ok' : row.basic ? 'basic' : 'no') : 'unk'}>
-                <span className="mark" aria-hidden="true">{row.food ? (row.have ? '✓' : row.basic ? '·' : '✗') : ''}</span>
+              <li key={i} className={row.junk || row.skip ? 'unk' : row.have ? 'ok' : row.basic ? 'basic' : 'no'}>
+                <span className="mark" aria-hidden="true">{row.junk || row.skip ? '' : row.have ? '✓' : row.basic ? '·' : '✗'}</span>
                 {row.food && <Icon id={row.food.icon} size={18} className="inline" />}
                 <span className="grow">
                   {row.line}
@@ -311,7 +314,7 @@ function RecipeSheet({ r, c, onClose }) {
             )
           )}
         </ul>
-        <p className="small muted">✓ ce l'hai · ✗ manca · · di solito ce l'hai (sale, olio...) · senza segno: non lo riconosco</p>
+        <p className="small muted">✓ ce l'hai · ✗ manca · · di solito ce l'hai (sale, olio, pepe...)</p>
         {toBuy.length > 0 ? (
           <Btn block icon="1f6d2" onClick={addMissing}>Aggiungi i mancanti alla spesa ({toBuy.length})</Btn>
         ) : c.missing.length > 0 ? (
