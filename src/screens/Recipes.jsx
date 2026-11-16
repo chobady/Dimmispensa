@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { norm } from '../catalog.js';
+import { isCasa, norm } from '../catalog.js';
 import { actions, cloudEnabled } from '../lib/store.js';
 import { addDays, expiryLabel, expiryStatus, fromISO } from '../lib/dates.js';
 import { newId } from '../lib/items.js';
@@ -49,7 +49,7 @@ export default function Recipes() {
 
   const soonIds = useMemo(() => new Set(state.items.filter((i) => ['today', 'soon'].includes(expiryStatus(i.expiry, warnDays))).map((i) => i.id)), [state.items, warnDays]);
   const checked = useMemo(() => {
-    const idx = pantryIndex(state.items, soonIds);
+    const idx = pantryIndex(state.items.filter((i) => !isCasa(i)), soonIds);
     return recipes.map((r) => ({ r, c: checkRecipe(r, idx), t: norm(`${r.title} ${(r.ingredients || []).join(' ')} ${(r.categories || []).join(' ')}`) }));
   }, [recipes, state.items, soonIds]);
   // libri/categorie di Mela, dal più grande

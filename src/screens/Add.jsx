@@ -642,7 +642,7 @@ function QtySheet({ ask, onClose, onAdd, title = 'Quanto ne hai?', note, addLabe
           <button type="button" className={'chip ' + (!d.expiry ? 'on' : '')} onClick={() => setExpiry(null)}>non scade</button>
         </div>
 
-        <div className="seg">
+        <div className="seg locs">
           {LOCATIONS.map((l) => (
             <button key={l.id} type="button" className={d.loc === l.id ? 'on' : ''} aria-pressed={d.loc === l.id} onClick={() => setLoc(l.id)}>
               <Icon id={l.icon} size={20} /> {l.name}

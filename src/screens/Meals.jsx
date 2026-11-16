@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { norm, roleOf, PORTIONS } from '../catalog.js';
+import { norm, roleOf, PORTIONS, isCasa } from '../catalog.js';
 import { actions } from '../lib/store.js';
 import { addDays, daysLeft, expiryLabel, expiryStatus, fromISO, todayISO, toISO } from '../lib/dates.js';
 import { defaultPortion, newId, portionLabel, qtyLabel } from '../lib/items.js';
@@ -142,6 +142,7 @@ export default function Meals() {
   }, [meals, today]);
 
   const urgentUnplanned = state.items
+    .filter((i) => !isCasa(i))
     .filter((i) => ['today', 'soon'].includes(expiryStatus(i.expiry, warnDays)) && !['bev', 'cond'].includes(roleOf(i)) && !plannedIds.has(i.id))
     .sort(byExpiry);
 
@@ -314,7 +315,7 @@ function Picker({ date, slot, entries, plannedIds, onClose, onRemove }) {
   const [portionFor, setPortionFor] = useState(null);
   const slotInfo = SLOTS.find((s) => s.id === slot);
   const inSlot = new Set(entries.map((e) => e.item).filter(Boolean));
-  const edible = state.items.filter((i) => expiryStatus(i.expiry, warnDays) !== 'expired').sort(byExpiry);
+  const edible = state.items.filter((i) => !isCasa(i) && expiryStatus(i.expiry, warnDays) !== 'expired').sort(byExpiry);
   const nq = norm(q);
   const shown = edible.filter((i) => !nq || norm(i.name + ' ' + (i.brand || '')).includes(nq));
   const urgent = shown.filter((i) => ['today', 'soon'].includes(expiryStatus(i.expiry, warnDays)));

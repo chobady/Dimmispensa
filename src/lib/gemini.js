@@ -105,7 +105,7 @@ const SCHEMA = {
           quantita: { type: 'NUMBER' },
           unita: { type: 'STRING', enum: ['pz', 'conf', 'g', 'kg', 'ml', 'l'] },
           tipo: { type: 'STRING' },
-          posto: { type: 'STRING', enum: ['frigo', 'freezer', 'dispensa'] },
+          posto: { type: 'STRING', enum: ['frigo', 'freezer', 'dispensa', 'spezie', 'casa'] },
           scadenza: { type: 'STRING' },
           scadenza_stimata: { type: 'BOOLEAN' },
           macro: { type: 'STRING', enum: ['proteine', 'carboidrati', 'grassi', 'fibre', 'nessuno'] },
@@ -191,9 +191,9 @@ Regole per ogni alimento:
 - "marca": la marca se la conosci, altrimenti "".
 - "quantita" e "unita": unita è una tra pz, conf, g, kg, ml, l. Se non è detto, usa quantita 1 e l'unità più naturale.
 - "tipo": la chiave più adatta presa ESATTAMENTE da questo elenco (la parte prima della parentesi), oppure "altro": ${TIPI}.
-- "posto": dove si conserva di solito: frigo, freezer o dispensa.
+- "posto": dove si conserva di solito: frigo, freezer, dispensa, spezie (spezie ed erbe secche, pepe) o casa (prodotti per la casa).
 - "scadenza": data AAAA-MM-GG. Se l'utente la dice o è leggibile, usa quella e metti "scadenza_stimata": false. Se non c'è, stima una data realistica partendo da oggi per quel prodotto conservato in quel posto e metti "scadenza_stimata": true. Se il prodotto non scade in pratica (sale, zucchero), usa "".
-- Ignora tutto ciò che non si mangia o non si beve (detersivi, sacchetti, sconti, totali, punti fedeltà).
+- I prodotti per la casa (detersivi, ammorbidente, pastiglie e sale per lavastoviglie, spugne, carta forno, alluminio, carta igienica, carta cucina, sacchetti, prodotti per pulire, sapone) vanno inclusi con "posto": "casa", il "tipo" adatto dall'elenco, "scadenza": "" e "macro": "nessuno". Ignora le buste della spesa, sconti, totali, punti fedeltà.
 - Se lo stesso prodotto compare più volte, unisci le righe sommando la quantità.
 - "macro": il macronutriente principale (proteine, carboidrati, grassi, fibre per verdure e simili poco caloriche; nessuno per acqua, sale, spezie, caffè, alcolici).
 - "kcal_100", "proteine_100", "carboidrati_100", "grassi_100": valori tipici per 100 g (o 100 ml) di quel prodotto, arrotondati.`;

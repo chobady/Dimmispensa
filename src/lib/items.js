@@ -49,7 +49,7 @@ export function makeDraft({ name, brand = '', qty, unit, foodKey, loc, expiry, e
     food: food.key,
     icon: food.icon,
     cat: food.cat,
-    loc: ['frigo', 'freezer', 'dispensa'].includes(loc) ? loc : food.loc,
+    loc: ['frigo', 'freezer', 'dispensa', 'spezie', 'casa'].includes(loc) ? loc : food.loc,
     // senza data: stima dalla durata tipica (nel freezer dura di più)
     expiry: hasDate ? expiry : food.days ? addDays(loc === 'freezer' && food.loc !== 'freezer' ? Math.max(food.days, 90) : food.days) : null,
     est: hasDate ? !!est : !!food.days,

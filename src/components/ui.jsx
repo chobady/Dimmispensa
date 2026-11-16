@@ -90,7 +90,7 @@ export function ItemCard({ item, onOpen, gone }) {
       <div className="grow">
         <div className="name">{item.name}</div>
         <div className="sub">
-          <span className={'loc ' + item.loc}>{item.loc === 'frigo' ? 'FRIGO' : item.loc === 'freezer' ? 'FREEZER' : 'DISP.'}</span>
+          <span className={'loc ' + item.loc}>{{ frigo: 'FRIGO', freezer: 'FREEZER', spezie: 'SPEZIE', casa: 'CASA' }[item.loc] || 'DISP.'}</span>
           <MacroBadge item={item} />
           {qtyLabel(item)}
           {item.brand ? ' · ' + item.brand : ''}

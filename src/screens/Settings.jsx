@@ -4,6 +4,7 @@ import { actions, cloudEnabled, friendlyError, prettyCode } from '../lib/store.j
 import { forgetModel, geminiStatus, GeminiError, testKey } from '../lib/gemini.js';
 import { fillNutrition } from '../lib/nutrition.js';
 import { CIQUAL } from '../ciqual-data.js';
+import { isCasa } from '../catalog.js';
 import { play, setSound, soundOn } from '../lib/sound.js';
 import { Btn, Icon, SectionTitle, useApp } from '../components/ui.jsx';
 
@@ -19,7 +20,7 @@ export default function Settings() {
   const [sureLeave, setSureLeave] = useState(false);
   const [classifying, setClassifying] = useState(false);
   // senza valori, oppure con una stima di Gemini ma con codice/marca per cercare l'etichetta vera
-  const missing = state.items.filter((i) => !i.nutr || (i.nutrSrc !== 'etichetta' && i.nutrSrc !== 'tabella' && CIQUAL[i.food]) || (i.nutrSrc !== 'etichetta' && (i.code || i.brand) && !i.labelTried));
+  const missing = state.items.filter((i) => !isCasa(i)).filter((i) => !i.nutr || (i.nutrSrc !== 'etichetta' && i.nutrSrc !== 'tabella' && CIQUAL[i.food]) || (i.nutrSrc !== 'etichetta' && (i.code || i.brand) && !i.labelTried));
   const [step, setStep] = useState('');
   const [usda, setUsda] = useState(pantry.usdaKey || '');
 

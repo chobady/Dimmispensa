@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { LOCATIONS, MACROS, macroOf, norm } from '../catalog.js';
+import { LOCATIONS, MACROS, isCasa, macroOf, norm } from '../catalog.js';
 import { daysLeft, expiryStatus } from '../lib/dates.js';
 import { play } from '../lib/sound.js';
 import { Btn, Icon, ItemCard, Talk, useApp } from '../components/ui.jsx';
@@ -13,6 +13,9 @@ export const byExpiry = (a, b) => {
   return da - db || a.name.localeCompare(b.name);
 };
 
+// posti piccoli, sotto le schede principali
+const MINI = ['spezie', 'casa'];
+
 export default function Pantry() {
   const { state, warnDays, openItem, go, goneIds } = useApp();
   const [loc, setLoc] = useState('tutto');
@@ -21,15 +24,19 @@ export default function Pantry() {
   const items = state.items;
 
   const counts = useMemo(() => {
-    const c = { tutto: items.length, frigo: 0, freezer: 0, dispensa: 0 };
-    items.forEach((i) => (c[i.loc] = (c[i.loc] || 0) + 1));
+    const c = { tutto: 0, frigo: 0, freezer: 0, dispensa: 0, spezie: 0, casa: 0 };
+    items.forEach((i) => {
+      const l = isCasa(i) ? 'casa' : i.loc;
+      c[l] = (c[l] || 0) + 1;
+      if (l !== 'casa') c.tutto++;
+    });
     return c;
   }, [items]);
 
   const shown = useMemo(() => {
     const nq = norm(q);
     return items
-      .filter((i) => loc === 'tutto' || i.loc === loc)
+      .filter((i) => (loc === 'casa' ? isCasa(i) : !isCasa(i) && (loc === 'tutto' || i.loc === loc)))
       .filter((i) => { const t = norm(i.name + ' ' + (i.brand || '')); return nq.split(' ').filter(Boolean).every((w) => t.includes(w)); })
       .filter((i) => macro === 'tutti' || macroOf(i) === macro)
       .sort(byExpiry);
@@ -61,7 +68,7 @@ export default function Pantry() {
       )}
 
       <div className="seg tall" style={{ marginTop: 14 }} role="tablist" aria-label="Dove">
-        {[{ id: 'tutto', name: 'Tutto', icon: '1f3e0' }, ...LOCATIONS].map((l) => (
+        {[{ id: 'tutto', name: 'Tutto', icon: '1f3e0' }, ...LOCATIONS.filter((l) => !MINI.includes(l.id))].map((l) => (
           <button
             key={l.id}
             type="button"
@@ -78,8 +85,25 @@ export default function Pantry() {
           </button>
         ))}
       </div>
+      <div className="mini-places" role="tablist" aria-label="Altri posti">
+        {LOCATIONS.filter((l) => MINI.includes(l.id)).map((l) => (
+          <button
+            key={l.id}
+            type="button"
+            role="tab"
+            aria-selected={loc === l.id}
+            className={'mini-place ' + (loc === l.id ? 'on' : '')}
+            onClick={() => {
+              play('tap');
+              setLoc(loc === l.id ? 'tutto' : l.id);
+            }}
+          >
+            <Icon id={l.icon} size={20} /> {l.id === 'casa' ? 'Casa e pulizia' : 'Spezie'} <span className="n">{counts[l.id] || 0}</span>
+          </button>
+        ))}
+      </div>
 
-      {items.length > 0 && (
+      {items.length > 0 && loc !== 'casa' && (
         <div className="chips macro-filter" role="group" aria-label="Macronutriente">
           <button type="button" className={'chip ' + (macro === 'tutti' ? 'on' : '')} onClick={() => setMacro('tutti')}>Tutti</button>
           {MACROS.map((m) => (

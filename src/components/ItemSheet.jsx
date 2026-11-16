@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ICONS } from '../icons-data.js';
-import { CATALOG, CATEGORIES, LOCATIONS, MACROS, UNITS, macroOf } from '../catalog.js';
+import { CATALOG, CATEGORIES, LOCATIONS, MACROS, UNITS, isCasa, macroOf } from '../catalog.js';
 import { addDays, expiryLabel } from '../lib/dates.js';
 import { stepOf } from '../lib/items.js';
 import { Btn, Icon, Sheet, useApp } from './ui.jsx';
@@ -25,6 +25,7 @@ const QUICK_DATES = [
 
 export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onShop, onFreeze, onClose }) {
   const [d, setD] = useState({ ...item, macro: macroOf(item) });
+  const casa = isCasa(d);
   const [picking, setPicking] = useState(false);
   const { state, toast } = useApp();
   const [finding, setFinding] = useState(false);
@@ -149,7 +150,7 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
 
         <div className="field">
           <span>Dove lo tieni</span>
-          <div className="seg">
+          <div className="seg locs">
             {LOCATIONS.map((l) => (
               <button key={l.id} type="button" className={d.loc === l.id ? 'on' : ''} aria-pressed={d.loc === l.id} onClick={() => up({ loc: l.id })}>
                 <Icon id={l.icon} size={20} /> {l.name}
@@ -171,6 +172,7 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
           </div>
         </div>
 
+        {!casa && (
         <div className="field">
           <span>Macronutriente principale</span>
           <div className="seg macro-seg">
@@ -210,6 +212,7 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
             </div>
           )}
         </div>
+        )}
 
         <label className="field">
           <span>Categoria</span>

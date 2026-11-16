@@ -14,13 +14,19 @@ export const CATEGORIES = [
   { id: 'dolci', name: 'Dolci e snack', icon: '1f36a', role: 'extra' },
   { id: 'bevande', name: 'Bevande', icon: 'acqua', role: 'bev' },
   { id: 'pronti', name: 'Piatti pronti e avanzi', icon: 'avanzi', role: 'pronto' },
+  { id: 'casa', name: 'Casa e pulizia', icon: 'detersivo', role: 'casa' },
 ];
 
 export const LOCATIONS = [
   { id: 'frigo', name: 'Frigo', icon: '1f9ca', short: 'F' },
   { id: 'freezer', name: 'Freezer', icon: '2744', short: 'Z' },
   { id: 'dispensa', name: 'Dispensa', icon: '1f9fa', short: 'D' },
+  { id: 'spezie', name: 'Spezie', icon: 'spezie', short: 'S' },
+  { id: 'casa', name: 'Casa', icon: 'detersivo', short: 'C' },
 ];
+
+// le cose di casa (detersivi, carta...) non si mangiano: fuori da pasti, ricette, valori e scadenze
+export const isCasa = (item) => item?.loc === 'casa' || item?.cat === 'casa' || BY_KEY[item?.food]?.cat === 'casa';
 
 export const UNITS = ['pz', 'conf', 'g', 'kg', 'ml', 'l'];
 
@@ -162,9 +168,10 @@ const ROWS = [
   ['olio', 'Olio', 'olio', 'dispensa', 'D', 540, 'l', 'olio evo|olio extravergine|olio di oliva|olio di semi'],
   ['aceto', 'Aceto', 'aceto', 'dispensa', 'D', 730, 'pz', 'aceto balsamico|glassa'],
   ['sale', 'Sale', '1f9c2', 'dispensa', 'D', 3650, 'conf', 'sale grosso|sale fino'],
-  ['pepe', 'Pepe', 'pepe', 'dispensa', 'D', 730, 'pz', ''],
+  ['pepe', 'Pepe', 'pepe', 'dispensa', 'S', 730, 'pz', ''],
   ['zucchero', 'Zucchero', 'zucchero', 'dispensa', 'D', 1095, 'g', 'zucchero di canna|dolcificante'],
-  ['spezie', 'Spezie', 'spezie', 'dispensa', 'D', 365, 'pz', 'origano|paprika|curry|curcuma|cannella|noce moscata|cumino|anice|anice stellato|zafferano|chiodi di garofano|vaniglia|bacca di vaniglia|cardamomo|ginepro|bacche di ginepro|macis|pimento|sumac|garam masala|cinque spezie|semi di cumino|carvi'],
+  ['erbesecche', 'Erbe secche', 'erbesecche', 'dispensa', 'S', 365, 'conf', 'erbe secche|origano secco|timo secco|rosmarino secco|basilico secco|prezzemolo secco|salvia secca|maggiorana secca|erbe di provenza|erbe provenzali|foglie di alloro|alloro|mix di erbe|aromi secchi', 'cond'],
+  ['spezie', 'Spezie', 'spezie', 'dispensa', 'S', 365, 'pz', 'origano|paprika|curry|curcuma|cannella|noce moscata|cumino|anice|anice stellato|zafferano|chiodi di garofano|vaniglia|bacca di vaniglia|cardamomo|ginepro|bacche di ginepro|macis|pimento|sumac|garam masala|cinque spezie|semi di cumino|carvi'],
   ['dado', 'Dado e lievito', 'dado', 'dispensa', 'D', 365, 'conf', 'dado|dadi|lievito|bicarbonato'],
   ['brodo', 'Brodo pronto', 'brodo', 'dispensa', 'D', 365, 'l', 'brodo'],
   ['pesto', 'Pesto', 'pesto', 'dispensa', 'F', 30, 'pz', 'pesto alla genovese'],
@@ -209,9 +216,24 @@ const ROWS = [
   ['hummus', 'Hummus e salse', '1f963', 'pronti', 'F', 7, 'conf', 'hummus|guacamole|tzatziki'],
   ['falafel', 'Falafel e burger veg', '1f9c6', 'pronti', 'F', 5, 'conf', 'falafel|burger vegetale|polpette veg'],
   ['pizzasurgelata', 'Pizza surgelata', '1f355', 'pronti', 'Z', 180, 'pz', 'pizza surgelata'],
+  // --- Casa e pulizia (non si mangiano) ---
+  ['detersivolavatrice', 'Detersivo lavatrice', 'detersivo', 'casa', 'C', 0, 'conf', 'detersivo lavatrice|detersivo bucato|detersivo per lavatrice|capsule lavatrice|pods lavatrice|lavatrice|bucato|smacchiatore'],
+  ['ammorbidente', 'Ammorbidente', 'ammorbidente', 'casa', 'C', 0, 'conf', 'ammorbidente|profumatore bucato|perle profumate'],
+  ['pastiglielavastoviglie', 'Pastiglie lavastoviglie', 'lavastoviglie', 'casa', 'C', 0, 'conf', 'pastiglie lavastoviglie|tabs lavastoviglie|capsule lavastoviglie|detersivo lavastoviglie|gel lavastoviglie|lavastoviglie|brillantante|pulisci lavastoviglie'],
+  ['salelavastoviglie', 'Sale lavastoviglie', 'salelavastoviglie', 'casa', 'C', 0, 'conf', 'sale lavastoviglie|sale per lavastoviglie|sale rigenerante'],
+  ['detersivopiatti', 'Detersivo piatti', 'detpiatti', 'casa', 'C', 0, 'pz', 'detersivo piatti|detersivo per piatti|piatti a mano|svelto|nelsen'],
+  ['spugne', 'Spugne e panni', 'spugna', 'casa', 'C', 0, 'pz', 'spugna|spugne|spugnette|paglietta|pagliette|panno spugna|panni spugna|panno microfibra|panni microfibra|panni|strofinacci'],
+  ['cartaforno', 'Carta forno', 'cartaforno', 'casa', 'C', 0, 'pz', 'carta forno|carta da forno'],
+  ['alluminio', 'Alluminio e pellicola', 'alluminio', 'casa', 'C', 0, 'pz', 'carta alluminio|alluminio|carta stagnola|stagnola|pellicola|pellicola trasparente|domopak|cuki|vaschette alluminio'],
+  ['sacchi', 'Sacchetti', 'sacchetti', 'casa', 'C', 0, 'conf', 'sacchi spazzatura|sacchetti spazzatura|sacchi immondizia|sacchetti immondizia|sacchetti gelo|sacchetti freezer|buste freezer|sacchi umido|sacchetti umido|sacchetti'],
+  ['cartaigienica', 'Carta igienica', 'rotolo', 'casa', 'C', 0, 'conf', 'carta igienica|rotoli carta igienica'],
+  ['cartacucina', 'Carta cucina', 'rotolo', 'casa', 'C', 0, 'conf', 'carta cucina|scottex|asciugatutto|rotoloni|tovaglioli|tovaglioli di carta|fazzoletti|fazzoletti di carta'],
+  ['candeggina', 'Candeggina', 'candeggina', 'casa', 'C', 0, 'pz', 'candeggina|varechina|ace|amuchina|igienizzante|disinfettante'],
+  ['sgrassatore', 'Pulizia (spray e detergenti)', 'spray', 'casa', 'C', 0, 'pz', 'sgrassatore|anticalcare|spray vetri|vetri|multiuso|detergente multiuso|chanteclair|viakal|cif|lysoform|detergente pavimenti|pavimenti|mastro lindo|detergente bagno|wc net|detergente|pulizia'],
+  ['sapone', 'Sapone e igiene', 'sapone', 'casa', 'C', 0, 'pz', 'sapone|sapone mani|saponetta|bagnoschiuma|docciaschiuma|shampoo|balsamo capelli|dentifricio|deodorante'],
 ];
 
-const LOC = { F: 'frigo', Z: 'freezer', D: 'dispensa' };
+const LOC = { F: 'frigo', Z: 'freezer', D: 'dispensa', S: 'spezie', C: 'casa' };
 const CAT_ROLE = Object.fromEntries(CATEGORIES.map((c) => [c.id, c.role]));
 
 export const norm = (s) =>

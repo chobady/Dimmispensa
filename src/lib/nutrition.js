@@ -1,3 +1,4 @@
+import { isCasa } from '../catalog.js';
 // Valori nutrizionali: 1) etichetta (Open Food Facts; USDA solo per prodotti USA), 2) tabella ufficiale Ciqual per i cibi generici, 3) SOLO se manca tutto, Gemini.
 import { classifyItems } from './gemini.js';
 import { macroFromNutr, tableNutr } from './items.js';
@@ -38,6 +39,7 @@ export async function fillNutrition(list, geminiKey, { byCode = true, byName = t
   let nameSearches = 0; // Open Food Facts limita le ricerche per nome: ne faccio al massimo maxName
   for (let i = 0; i < out.length; i++) {
     const x = out[i];
+    if (isCasa(x)) continue; // detersivi e simili: niente valori nutrizionali
     if (x.nutrSrc === 'etichetta' && nutrComplete(x.nutr)) continue;
     // cibi sfusi già con i valori della tabella e senza codice/marca: non c'è un'etichetta da cercare
     if (x.nutrSrc === 'tabella' && !x.code && !x.brand && !forcedCode) continue;

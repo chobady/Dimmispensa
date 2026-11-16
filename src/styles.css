@@ -214,7 +214,7 @@ select.input { padding-right: 6px; }
 .card.soon { background: #fff6c9; }
 .card.gone { animation: faint .5s steps(6) forwards; }
 .card .loc { font-family: var(--font-title); font-size: 8px; padding: 3px 3px 2px 4px; color: #fff; display: inline-block; vertical-align: 1px; margin-right: 6px; }
-.loc.frigo { background: var(--blue); } .loc.freezer { background: #5a7ad8; } .loc.dispensa { background: var(--orange); }
+.loc.frigo { background: var(--blue); } .loc.freezer { background: #5a7ad8; } .loc.dispensa { background: var(--orange); } .loc.spezie { background: #a0522d; } .loc.casa { background: #6a5acd; }
 @keyframes pop { 0% { transform: scale(.85); opacity: 0; } 60% { transform: scale(1.04); opacity: 1; } 100% { transform: scale(1); } }
 @keyframes faint { 0%, 30%, 60% { opacity: 1; } 15%, 45% { opacity: .2; } 100% { opacity: 0; transform: translateY(14px); } }
 
@@ -640,3 +640,13 @@ body.no-scroll { overflow: hidden; }
 .gemini-state.ok { background: #e6f4d8; }
 .gemini-state.warn { background: #fff1c2; }
 .gemini-state.bad { background: #fbe0dc; }
+
+/* ---------- spezie e casa ---------- */
+.seg.locs { flex-wrap: wrap; row-gap: var(--px); }
+.seg.locs button { flex: 1 1 30%; }
+.seg.locs button + button { margin-left: 0; }
+.seg.locs { gap: var(--px); }
+.mini-places { display: flex; gap: 10px; margin: 12px 0 0; }
+.mini-place { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 8px; border: 0; background: var(--white); font: inherit; font-size: 15px; font-weight: 600; color: var(--ink); box-shadow: 0 0 0 3px var(--ink), inset -3px -3px 0 rgba(43,33,64,.13); cursor: pointer; }
+.mini-place.on { background: var(--yellow); }
+.mini-place .n { font-family: var(--font-title); font-size: 8px; }
