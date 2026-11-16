@@ -48,3 +48,5 @@ I valori medi dei cibi sfusi vengono dalla tabella [Ciqual 2025](https://ciqual.
 
 Le offerte dei volantini (Spesa → Volantini) vengono lette dalle pagine pubbliche di [PromoQui](https://www.promoqui.it) tramite la funzione `api/offerte.js`, solo per uso personale. Se un giorno smette di funzionare, apri `/api/offerte?c=latte&debug=1` sul tuo sito per vedere cosa risponde PromoQui.
 I font sono Press Start 2P e Pixelify Sans (licenza OFL).
+
+Gli abbinamenti "per aromi in comune" vengono dai dati supplementari di *Flavor network and the principles of food pairing* (Y.-Y. Ahn, S. E. Ahnert, J. P. Bagrow, A.-L. Barabási, Scientific Reports 1:196, 2011, licenza CC BY-NC-SA), elaborati da `tools/build-flavor.py` in `src/flavor-data.js`. Uso personale, non commerciale.
