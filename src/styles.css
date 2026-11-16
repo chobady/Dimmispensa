@@ -650,3 +650,6 @@ body.no-scroll { overflow: hidden; }
 .mini-place { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 8px; border: 0; background: var(--white); font: inherit; font-size: 15px; font-weight: 600; color: var(--ink); box-shadow: 0 0 0 3px var(--ink), inset -3px -3px 0 rgba(43,33,64,.13); cursor: pointer; }
 .mini-place.on { background: var(--yellow); }
 .mini-place .n { font-family: var(--font-title); font-size: 8px; }
+.servings { display: flex; flex-direction: column; gap: 8px; padding: 10px; margin-bottom: 10px; }
+.servings .field { margin: 0; }
+.ingr-list .scaled { font-weight: 700; color: var(--shell); }

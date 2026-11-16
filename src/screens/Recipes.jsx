@@ -3,7 +3,7 @@ import { isCasa, norm } from '../catalog.js';
 import { actions, cloudEnabled } from '../lib/store.js';
 import { addDays, expiryLabel, expiryStatus, fromISO } from '../lib/dates.js';
 import { newId } from '../lib/items.js';
-import { checkRecipe, cleanIngredient, melaLink, pantryIndex, readMelaFiles } from '../lib/mela.js';
+import { checkRecipe, cleanIngredient, melaLink, pantryIndex, readMelaFiles, scaleLine, servingsOf } from '../lib/mela.js';
 import { play } from '../lib/sound.js';
 import { Btn, Icon, SectionTitle, Sheet, Talk, useApp } from '../components/ui.jsx';
 import { SLOTS } from './Meals.jsx';
@@ -226,6 +226,11 @@ function RecipeSheet({ r, c, onClose }) {
   const [plan, setPlan] = useState(false);
   const [day, setDay] = useState(addDays(0));
   const [sure, setSure] = useState(false);
+  // porzioni: la ricetta dice "4 persone"; se non lo dice, chiedo io per quante è
+  const found = servingsOf(r.yield);
+  const [base, setBase] = useState(found || 4);
+  const [people, setPeople] = useState(found || 4);
+  const k = base ? people / base : 1;
   const mela = melaLink(r);
   const times = [r.prepTime && `prep. ${r.prepTime}`, r.cookTime && `cottura ${r.cookTime}`, !r.prepTime && !r.cookTime && r.totalTime && r.totalTime, r.yield].filter(Boolean);
 
@@ -317,6 +322,32 @@ function RecipeSheet({ r, c, onClose }) {
         )}
 
         <SectionTitle icon="1f6d2">Ingredienti</SectionTitle>
+        <div className="servings win flat">
+          {!found && (
+            <div className="field">
+              <span>La ricetta non dice per quante persone è: per quante?</span>
+              <div className="stepper">
+                <Btn sm aria-label="Meno" onClick={() => setBase(Math.max(1, base - 1))}>−</Btn>
+                <span className="val">{base}</span>
+                <Btn sm aria-label="Più" onClick={() => setBase(Math.min(50, base + 1))}>+</Btn>
+              </div>
+            </div>
+          )}
+          <div className="field">
+            <span>Persone{found ? ` (la ricetta è per ${found})` : ''}</span>
+            <div className="stepper">
+              <Btn sm aria-label="Una persona in meno" onClick={() => setPeople(Math.max(1, people - 1))}>−</Btn>
+              <span className="val" aria-live="polite">{people}</span>
+              <Btn sm aria-label="Una persona in più" onClick={() => setPeople(Math.min(60, people + 1))}>+</Btn>
+              {people !== base && (
+                <button type="button" className="chip" style={{ marginLeft: 8 }} onClick={() => setPeople(base)}>
+                  come la ricetta
+                </button>
+              )}
+            </div>
+          </div>
+          {people !== base && <p className="small">Quantità per {people} {people === 1 ? 'persona' : 'persone'} (×{String(Math.round(k * 100) / 100).replace('.', ',')}). Sale, pepe e spezie regolali a gusto.</p>}
+        </div>
         <ul className="ingr-list">
           {c.rows.map((row, i) =>
             row.header ? (
@@ -326,7 +357,10 @@ function RecipeSheet({ r, c, onClose }) {
                 <span className="mark" aria-hidden="true">{row.junk || row.skip ? '' : row.have ? '✓' : row.basic ? '·' : '✗'}</span>
                 {row.food && <Icon id={row.food.icon} size={18} className="inline" />}
                 <span className="grow">
-                  {row.line}
+                  {(() => {
+                    const sc = scaleLine(row.line, k);
+                    return sc.changed ? <b className="scaled">{sc.text}</b> : row.line;
+                  })()}
                   {row.have && row.items[0]?.expiry && ['today', 'soon', 'expired'].includes(expiryStatus(row.items[0].expiry)) && <span className="small soon-inline"> · {expiryLabel(row.items[0].expiry, row.items[0].est)}</span>}
                 </span>
               </li>

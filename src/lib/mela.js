@@ -354,3 +354,49 @@ export function checkRecipe(recipe, idx) {
   }
   return { rows, have, need, missing, usesSoon, ratio: need ? have / need : 0 };
 }
+
+// ---- porzioni: "4 persone" → 4, e ingredienti moltiplicati ----
+const FRAC = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3 };
+export function servingsOf(y) {
+  const m = String(y || '').match(/(\d+)/);
+  const n = m ? Number(m[1]) : 0;
+  return n > 0 && n <= 50 ? n : 0;
+}
+const toN = (s) => {
+  s = s.trim();
+  if (FRAC[s]) return FRAC[s];
+  const f = s.match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (f) return Number(f[1]) / Number(f[2]);
+  const mixed = s.match(/^(\d+)\s*([½¼¾⅓⅔])$/);
+  if (mixed) return Number(mixed[1]) + FRAC[mixed[2]];
+  return parseFloat(s.replace(',', '.'));
+};
+function fmtQty(n, unit) {
+  const u = (unit || '').toLowerCase();
+  let v;
+  if (/^(g|gr|ml)$/.test(u)) v = n >= 50 ? Math.round(n / 5) * 5 : Math.round(n);
+  else if (n >= 10) v = Math.round(n);
+  else v = Math.round(n * 4) / 4; // quarti: 0,25 0,5 0,75
+  if (v === 0) v = Math.round(n * 100) / 100 || n;
+  return String(Math.round(v * 100) / 100).replace('.', ',');
+}
+const NUM = '(\\d+\\s*[½¼¾⅓⅔]|\\d+\\s*\\/\\s*\\d+|\\d+(?:[.,]\\d+)?|[½¼¾⅓⅔])';
+const UNIT = '(kg|g|gr|ml|cl|dl|l|lt)\\b';
+// moltiplica la quantità della riga (quella in testa, oppure la prima con un'unità di misura)
+export function scaleLine(line, k) {
+  if (!k || Math.abs(k - 1) < 1e-9) return { text: line, changed: false };
+  const head = line.match(new RegExp(`^(\\s*[-•*]?\\s*)${NUM}(\\s*[-–]\\s*${NUM})?(\\s*${UNIT})?`, 'i'));
+  if (head) {
+    const unit = head[6] || '';
+    const a = fmtQty(toN(head[2]) * k, unit);
+    const b = head[4] ? '-' + fmtQty(toN(head[4]) * k, unit) : '';
+    return { text: head[1] + a + b + (head[5] || '') + line.slice(head[0].length), changed: true };
+  }
+  const re = new RegExp(`(^|[^\\d,.])${NUM}(\\s*)${UNIT}`, 'i');
+  const m = line.match(re);
+  if (m) {
+    const val = fmtQty(toN(m[2]) * k, m[4]);
+    return { text: line.slice(0, m.index) + m[1] + val + m[3] + m[4] + line.slice(m.index + m[0].length), changed: true };
+  }
+  return { text: line, changed: false };
+}
