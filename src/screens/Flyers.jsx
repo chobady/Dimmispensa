@@ -141,6 +141,14 @@ export default function Flyers({ shopList }) {
     const data = await api(`store=${encodeURIComponent(st.slug)}${flyer ? '&flyer=' + flyer : ''}${extra ? '&extra=' + encodeURIComponent(extra) : ''}`);
     const until = data.until && data.until >= todayISO() ? data.until : addDays(7);
     const fresh = (data.offers || []).slice(0, 250).map((o, i) => toOffer(o, { store: st.name, storeSlug: st.slug, until, tag: 'fl:' + st.slug }, i));
+    if (!fresh.length) {
+      // niente di nuovo: tengo le offerte che c'erano (se valide) invece di cancellarle
+      const d = data.diag || {};
+      const why = data.blocked
+        ? 'PromoQui in questo momento rifiuta le richieste: riprova tra qualche ora, le offerte di prima restano.'
+        : `non trovo offerte (pagina ${d.chain ?? '?'}, volantino ${d.flyer ?? '?'}, ricerche ${d.swept ?? 0}). Le offerte di prima restano.`;
+      throw new Error(`${st.name}: ${why}`);
+    }
     replaceTag('fl:' + st.slug, fresh);
     actions.linkSet(st.id, { ...st, flyer, mode: data.mode || '', flyerId: data.flyer || '', title: data.title || '', from: data.from || '', until: data.until || '', url: data.url || st.url, fetchedAt: Date.now(), count: fresh.length });
     if (!quiet) {

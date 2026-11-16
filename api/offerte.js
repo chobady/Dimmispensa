@@ -307,10 +307,12 @@ async function flyerHandler(q, res, debug) {
     const slugs = [...new Set([...extra, ...SWEEP])].slice(0, 70);
     const t0 = Date.now();
     let swept = 0;
-    for (let i = 0; i < slugs.length && Date.now() - t0 < 15000; i += 10) {
-      const pages = await Promise.all(slugs.slice(i, i + 10).map((sl) => getPage(sl).catch(() => ({ html: '' }))));
+    const statuses = {};
+    for (let i = 0; i < slugs.length && Date.now() - t0 < 15000; i += 6) {
+      const pages = await Promise.all(slugs.slice(i, i + 6).map((sl) => getPage(sl).catch(() => ({ html: '', status: 'err' }))));
       for (const pg of pages) {
         swept++;
+        statuses[pg.status] = (statuses[pg.status] || 0) + 1;
         for (const o of pg.html ? parseOffers(pg.html) : []) {
           if (o.storeSlug !== store) continue;
           const k = `${slugify(o.name)}|${o.price}`;
@@ -322,11 +324,18 @@ async function flyerHandler(q, res, debug) {
       }
     }
     info.swept = swept;
+    info.statuses = statuses;
     mode = 'ricerca';
+    // tutte (o quasi) rifiutate: PromoQui ci sta bloccando per un po'
+    const refused = (statuses[403] || 0) + (statuses[429] || 0) + (statuses.err || 0);
+    if (!offers.length && swept && refused >= swept * 0.7) info.blocked = true;
   }
   const storeName = (flyerTitle.match(/volantino\s+([^|–-]+?)(?:\s+(?:a|dal|valido|\||–|-)|$)/i) || [])[1] || '';
-  res.setHeader('Cache-Control', offers.length ? 's-maxage=21600, stale-while-revalidate=86400' : 's-maxage=600');
+  res.setHeader('Cache-Control', offers.length ? 's-maxage=21600, stale-while-revalidate=86400' : 'no-store');
   res.status(200).json({
+    ...(debug ? { info } : {}),
+    blocked: !!info.blocked,
+    diag: { chain: info.storeStatus ?? null, flyer: info.flyerStatus ?? null, swept: info.swept ?? 0, statuses: info.statuses || null },
     store,
     storeName: storeName.trim(),
     flyer: id,
@@ -336,7 +345,7 @@ async function flyerHandler(q, res, debug) {
     until: dates.until || '',
     url: `${BASE}/volantino/${store}${id ? "/" + id : ""}`,
     offers: offers.slice(0, 300),
-    ...(debug ? { info, sample: fp.html.slice(0, 5000), scripts: [...fp.html.matchAll(/<script\b([^>]*)>([\s\S]{0,300})/gi)].map((m) => (m[1] + ' ' + m[2]).slice(0, 300)).slice(0, 40) } : {}),
+    ...(debug ? { sample: fp.html.slice(0, 5000), scripts: [...fp.html.matchAll(/<script\b([^>]*)>([\s\S]{0,300})/gi)].map((m) => (m[1] + ' ' + m[2]).slice(0, 300)).slice(0, 40) } : {}),
   });
 }
 
