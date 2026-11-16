@@ -653,3 +653,9 @@ body.no-scroll { overflow: hidden; }
 .servings { display: flex; flex-direction: column; gap: 8px; padding: 10px; margin-bottom: 10px; }
 .servings .field { margin: 0; }
 .ingr-list .scaled { font-weight: 700; color: var(--shell); }
+.pairings { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--white); box-shadow: 0 0 0 3px var(--ink); }
+.pairings > b { font-family: var(--font-title); font-size: 11px; }
+.pair-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pair { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 15px; background: #efe9da; box-shadow: 0 0 0 2px var(--ink); }
+.pair.have { background: #d9efc4; font-weight: 700; }
+.pair .ok { color: #2f7d32; }

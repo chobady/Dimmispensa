@@ -402,3 +402,82 @@ export function scaleLine(line, k) {
   }
   return { text: line, changed: false };
 }
+
+// ---- abbinamenti: cosa compare spesso insieme nelle TUE ricette ----
+// Chiave di un ingrediente: il cibo del catalogo, più preciso se la riga nomina un tipo (spezie → cannella).
+const pairKey = (food, kw, generic) => (generic || !kw ? food.key : `${food.key}:${kw}`);
+export const pairLabel = (key) => {
+  const [k, kw] = key.split(':');
+  const f = BY_KEY[k];
+  const name = kw || f?.name || k;
+  return name.charAt(0).toUpperCase() + name.slice(1);
+};
+export const pairIcon = (key) => BY_KEY[key.split(':')[0]]?.icon || '1f4e6';
+// sale, olio, acqua... stanno con tutto: non dicono niente
+const NOPAIR = new Set(['sale', 'pepe', 'olio', 'acqua', 'aceto', 'brodo', 'dado', 'zucchero', 'farina', 'burro', 'uova', 'aglio', 'cipolla']);
+
+let pairCache = { sig: '', data: null };
+export function buildPairs(recipes) {
+  const sig = `${recipes.length}|${recipes[0]?.id || ''}|${recipes[recipes.length - 1]?.id || ''}`;
+  if (pairCache.sig === sig) return pairCache.data;
+  const count = new Map();
+  const co = new Map();
+  for (const r of recipes) {
+    const keys = new Set();
+    for (const row of rowsOf(r)) {
+      if (row.header || row.junk || !row.food) continue;
+      keys.add(pairKey(row.food, row.kw, row.generic));
+    }
+    const list = [...keys];
+    for (const a of list) count.set(a, (count.get(a) || 0) + 1);
+    for (let i = 0; i < list.length; i++)
+      for (let j = i + 1; j < list.length; j++) {
+        const [a, b] = list[i] < list[j] ? [list[i], list[j]] : [list[j], list[i]];
+        const k = a + '|' + b;
+        co.set(k, (co.get(k) || 0) + 1);
+      }
+  }
+  const partners = new Map();
+  for (const [k, n] of co) {
+    if (n < 3) continue;
+    const [a, b] = k.split('|');
+    // quanto stanno insieme rispetto a quanto compaiono da soli (così il prezzemolo non vince sempre)
+    const score = n / Math.sqrt(count.get(a) * count.get(b));
+    for (const [x, y] of [[a, b], [b, a]]) {
+      if (!partners.has(x)) partners.set(x, []);
+      partners.get(x).push({ key: y, n, score });
+    }
+  }
+  for (const l of partners.values()) l.sort((p, q) => q.score - p.score);
+  pairCache = { sig, data: { partners, count, total: recipes.length } };
+  return pairCache.data;
+}
+
+// Chiavi possibili per un cibo della dispensa (la più precisa prima)
+export function itemPairKeys(item) {
+  const f = BY_KEY[item.food];
+  if (!f) return [];
+  const kw = kwIn(f, item.name || '');
+  const out = [];
+  if (kw && !isGeneric(f, kw)) out.push(`${f.key}:${kw}`);
+  out.push(f.key);
+  return out;
+}
+
+// Gli abbinamenti per un cibo: i più forti, senza gli ingredienti "di base"
+export function pairsFor(item, recipes, max = 10) {
+  if (!recipes?.length) return [];
+  const { partners } = buildPairs(recipes);
+  const seen = new Set(itemPairKeys(item));
+  const out = [];
+  for (const key of itemPairKeys(item)) {
+    for (const p of partners.get(key) || []) {
+      const base = p.key.split(':')[0];
+      if (seen.has(p.key) || NOPAIR.has(base)) continue;
+      seen.add(p.key);
+      out.push(p);
+    }
+    if (out.length >= max) break;
+  }
+  return out.sort((a, b) => b.score - a.score).slice(0, max);
+}

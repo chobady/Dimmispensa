@@ -5,6 +5,7 @@ import { addDays, expiryLabel } from '../lib/dates.js';
 import { stepOf } from '../lib/items.js';
 import { Btn, Icon, Sheet, useApp } from './ui.jsx';
 import MacroPanel from './MacroPie.jsx';
+import Pairings from './Pairings.jsx';
 import { CIQUAL } from '../ciqual-data.js';
 import { sumMacros } from '../lib/macros.js';
 import { fillNutrition } from '../lib/nutrition.js';
@@ -121,6 +122,7 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
           </div>
         )}
         {!isNew && onShop && <Btn block sm icon="1f6d2" sound={null} onClick={onShop}>Aggiungi alla lista della spesa</Btn>}
+        {!isNew && !casa && <Pairings item={d} />}
         <label className="field">
           <span>Marca (facoltativa)</span>
           <input className="input" value={d.brand || ''} onChange={(e) => up({ brand: e.target.value })} maxLength={40} placeholder="es. Barilla" />
