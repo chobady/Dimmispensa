@@ -113,6 +113,12 @@ const local = {
     lsSet('dm_recipes', next);
     set({ recipes: next });
   },
+  async recipesRemove(ids) {
+    const del = new Set(ids);
+    const next = state.recipes.filter((r) => !del.has(r.id));
+    lsSet('dm_recipes', next);
+    set({ recipes: next });
+  },
   async addItems(drafts) {
     const now = Date.now();
     local.save([...state.items, ...drafts.map((d, i) => ({ ...d, addedAt: d.addedAt || now + i, by: d.by || '' }))]);
@@ -340,6 +346,14 @@ const cloud = {
     const { db, F } = fb;
     await F.deleteDoc(F.doc(db, 'pantries', state.pantry.id, 'recipes', id));
   },
+  async recipesRemove(ids) {
+    const { db, F } = fb;
+    for (let i = 0; i < ids.length; i += 400) {
+      const batch = F.writeBatch(db);
+      ids.slice(i, i + 400).forEach((id) => batch.delete(F.doc(db, 'pantries', state.pantry.id, 'recipes', id)));
+      await batch.commit();
+    }
+  },
 
   async signUp(name, email, password) {
     const { auth, A } = fb;
@@ -525,6 +539,7 @@ export const actions = {
   renamePantry: cloud.renamePantry,
   recipesPut: (list) => impl.recipesPut(list),
   recipeRemove: (id) => impl.recipeRemove(id),
+  recipesRemove: (ids) => impl.recipesRemove(ids),
   recipeUpdate: (id, patch) => impl.recipeUpdate(id, patch),
   savePush: cloud.savePush,
   removePush: cloud.removePush,

@@ -175,6 +175,7 @@ export default function Recipes() {
               </select>
             </label>
           )}
+          {cat && <RemoveBook cat={cat} ids={recipes.filter((r) => (r.categories || []).includes(cat)).map((r) => r.id)} onDone={() => setCat('')} />}
           <label className="pick-wrap">
             <span className="sr-only">Ordina le ricette</span>
             <select className="input pick" value={sort} onChange={(e) => pickSort(e.target.value)}>
@@ -400,5 +401,38 @@ function RecipeSheet({ r, c, onClose }) {
         )}
       </div>
     </Sheet>
+  );
+}
+
+// Togli in un colpo tutte le ricette di un libro/categoria (in Mela restano)
+function RemoveBook({ cat, ids, onDone }) {
+  const { toast } = useApp();
+  const [sure, setSure] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setSure(false), [cat]);
+  const go = async () => {
+    setBusy(true);
+    try {
+      await actions.recipesRemove(ids);
+      play('tap');
+      toast(`Tolte ${ids.length} ricette di ${cat}. In Mela restano.`);
+      onDone();
+    } catch (e) {
+      play('error');
+      toast(e.message || 'Non sono riuscito a toglierle.', { err: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return sure ? (
+    <div className="win flat stack" style={{ marginBottom: 10 }} role="alert">
+      <p className="small">Tolgo da Dimmispensa tutte le {ids.length} ricette di "{cat}"? Le ricette salvate con la ★ vanno via anche loro. In Mela restano.</p>
+      <div className="two">
+        <Btn sm onClick={() => setSure(false)} disabled={busy}>No</Btn>
+        <Btn sm color="red" onClick={go} disabled={busy}>{busy ? 'Tolgo...' : `Sì, togli ${ids.length}`}</Btn>
+      </div>
+    </div>
+  ) : (
+    <Btn sm block style={{ marginBottom: 10 }} onClick={() => setSure(true)}>Togli tutte le ricette di questo libro ({ids.length})</Btn>
   );
 }
