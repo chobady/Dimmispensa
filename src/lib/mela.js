@@ -244,6 +244,8 @@ export function parseIngredient(line, key) {
   let food = (key ? BY_KEY[key] : null) || matchFood(clean) || null;
   // "aceto di vino" è aceto, non vino
   if (/\baceto\b/i.test(clean) && BY_KEY.aceto) food = BY_KEY.aceto;
+  // carta forno, pellicola, stuzzicadenti...: attrezzi, non ingredienti da comprare
+  if (food && food.cat === 'casa') return { line: clean, food: null, basic: false, variant: [], junk: true, kw: '', generic: true };
   const junk = (clean.match(/[a-zà-ú]/gi) || []).length < 3; // righe tipo "1" rimaste dall'export
   const variant = food ? variantsIn(food.key, norm(clean)) : [];
   const kw = food ? kwIn(food, clean) : '';
