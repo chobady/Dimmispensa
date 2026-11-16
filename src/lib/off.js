@@ -6,8 +6,12 @@ import { codeVariants } from './barcode.js';
 
 const FIELDS = 'product_name,product_name_it,product_name_en,generic_name_it,generic_name,brands,quantity,product_quantity,product_quantity_unit,categories_tags,nutriments';
 
-async function fetchProduct(code) {
-  const url = `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=${FIELDS}`;
+// Stessa banca dati libera, tre siti: cibo, prodotti per la casa, cosmetici e igiene
+const FOOD = 'https://world.openfoodfacts.org';
+const HOUSE = ['https://world.openproductsfacts.org', 'https://world.openbeautyfacts.org'];
+
+async function fetchProduct(code, host = FOOD) {
+  const url = `${host}/api/v2/product/${encodeURIComponent(code)}.json?fields=${FIELDS}`;
   const r = await fetch(url);
   if (!r.ok && r.status !== 404) throw new Error('Open Food Facts non risponde. Riprova tra poco.');
   const data = await r.json().catch(() => ({}));
@@ -23,7 +27,8 @@ export async function lookupBarcode(code) {
     p = await fetchProduct(c);
     if (p) break;
   }
-  if (!p) return null;
+  // non è un cibo? provo detersivi, carta, sapone... (Open Products Facts e Open Beauty Facts)
+  if (!p) return lookupHouse(code);
   const name = (p.product_name_it || p.product_name || p.product_name_en || p.generic_name_it || p.generic_name || '').trim();
   if (!name) return null;
   const brand = String(p.brands || '').split(',')[0].trim();
@@ -41,6 +46,31 @@ export async function lookupBarcode(code) {
   }
   const nutr = labelNutr(p);
   return makeDraft({ name, brand, qty, unit, foodKey: food?.key, nutr, nutrSrc: 'etichetta', code });
+}
+
+async function lookupHouse(code) {
+  let p = null;
+  for (const host of HOUSE) {
+    for (const c of codeVariants(code)) {
+      p = await fetchProduct(c, host).catch(() => null);
+      if (p) break;
+    }
+    if (p) break;
+  }
+  if (!p) return null;
+  const name = (p.product_name_it || p.product_name || p.product_name_en || p.generic_name_it || p.generic_name || '').trim();
+  if (!name) return null;
+  const brand = String(p.brands || '').split(',')[0].trim();
+  const cats = (p.categories_tags || []).map((c) => c.replace(/^[a-z]{2}:/, '').replace(/-/g, ' ')).join(' ');
+  const hit = [matchFood(name), matchFood(p.generic_name_it || ''), matchFood(cats)].find((f) => f && f.cat === 'casa');
+  let qty = 1;
+  let unit = 'pz';
+  const q = Number(p.product_quantity);
+  const u = String(p.product_quantity_unit || '').toLowerCase();
+  if (q > 0 && ['ml', 'l'].includes(u)) [qty, unit] = u === 'ml' && q >= 1000 ? [q / 1000, 'l'] : [q, u];
+  const d = makeDraft({ name, brand, qty, unit, foodKey: hit?.key, loc: 'casa', code });
+  // anche se non so di preciso cos'è, sta tra le cose di casa
+  return { ...d, cat: 'casa', loc: 'casa', expiry: null, est: false, macro: null };
 }
 
 // Valori nutrizionali stampati in etichetta (per 100 g/ml), se Open Food Facts li ha

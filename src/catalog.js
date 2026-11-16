@@ -312,6 +312,21 @@ export const PORTIONS = {
 
 // Nomi inglesi (prodotti americani, scontrini, etichette): servono per riconoscere il cibo
 const EN_KW = {
+  // casa (categorie di Open Products Facts / Open Beauty Facts, in inglese)
+  detersivolavatrice: 'laundry detergent|laundry detergents|laundry|washing powder|washing liquid|laundry capsules',
+  ammorbidente: 'fabric softener|fabric softeners|softener',
+  pastiglielavastoviglie: 'dishwasher tablets|dishwasher detergent|dishwasher detergents|dishwasher capsules|rinse aid',
+  salelavastoviglie: 'dishwasher salt',
+  detersivopiatti: 'dishwashing liquid|dishwashing liquids|dish soap|washing up liquid',
+  spugne: 'sponge|sponges|cleaning cloths|microfiber cloths',
+  cartaforno: 'baking paper|parchment paper',
+  alluminio: 'aluminium foil|aluminum foil|cling film|food wrap',
+  sacchi: 'bin bags|trash bags|garbage bags|freezer bags',
+  cartaigienica: 'toilet paper|toilet tissue',
+  cartacucina: 'kitchen paper|kitchen rolls|paper towels|paper tissues|facial tissues|napkins',
+  candeggina: 'bleach|bleaches|disinfectant|disinfectants',
+  sgrassatore: 'household cleaners|cleaning products|cleaners|degreaser|degreasers|glass cleaner|limescale remover|floor cleaner|toilet cleaner|surface cleaner',
+  sapone: 'soap|soaps|hand soap|shower gel|shower gels|shampoo|shampoos|toothpaste|toothpastes|deodorant|deodorants|body wash',
   pomodoro: 'tomato|tomatoes|cherry tomatoes',
   insalata: 'lettuce|salad|iceberg|romaine|mixed greens|cabbage|kale',
   spinaci: 'spinach|baby spinach',
