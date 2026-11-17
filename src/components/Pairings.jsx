@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { actions } from '../lib/store.js';
 import { FLAVOR } from '../flavor-data.js';
 import { itemPairKeys, pairIcon, pairLabel, pairsFor } from '../lib/mela.js';
 import { Icon, useApp } from './ui.jsx';
@@ -42,6 +43,7 @@ function Chips({ list, has }) {
 export default function Pairings({ item }) {
   const { state } = useApp();
   const recipes = state.recipes || [];
+  useEffect(() => actions.watchRecipes(), []);
   const fromRecipes = useMemo(() => pairsFor(item, recipes, 10).map((p) => ({ ...p, title: `insieme in ${p.n} ricette` })), [item.food, item.name, recipes]);
   const fromAroma = useMemo(() => {
     const seen = new Set([...itemPairKeys(item), ...fromRecipes.map((p) => p.key)]);

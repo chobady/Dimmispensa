@@ -659,3 +659,4 @@ body.no-scroll { overflow: hidden; }
 .pair { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 15px; background: #efe9da; box-shadow: 0 0 0 2px var(--ink); }
 .pair.have { background: #d9efc4; font-weight: 700; }
 .pair .ok { color: #2f7d32; }
+.recipe-hero.ph { height: 160px; background: #e4ddd0; }

@@ -38,6 +38,8 @@ let state = {
   items: [],
   recipes: [],
   recipesError: '',
+  recipesLoaded: false,
+  recipesMigrating: 0,
   offers: {}, // offerte lette dai volantini: { id: { name, brand, price, oldPrice, size, until, store, food, icon } }
   flyerLinks: {}, // supermercati preferiti: { id: { name, url } }
   shopping: {}, // { id: { id, name, qty, unit, food, icon, cat, done, by, addedAt } }
@@ -113,6 +115,13 @@ const local = {
     lsSet('dm_recipes', next);
     set({ recipes: next });
   },
+  watchRecipes() {
+    set({ recipesLoaded: true });
+  },
+  async recipeBody(id) {
+    const r = state.recipes.find((x) => x.id === id) || {};
+    return { instructions: r.instructions || '', notes: r.notes || '', text: r.text || '', img: r.img || '' };
+  },
   async recipesRemove(ids) {
     const del = new Set(ids);
     const next = state.recipes.filter((r) => !del.has(r.id));
@@ -182,6 +191,10 @@ let unsubUser = null;
 let unsubPantry = null;
 let unsubItems = null;
 let unsubRecipes = null;
+let recipesWanted = false;
+let recipesPid = null;
+let migrating = false;
+const bodyCache = new Map();
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const newCode = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => CODE_CHARS[b % CODE_CHARS.length]).join('');
@@ -317,15 +330,71 @@ const cloud = {
       },
       (e) => console.error(e)
     );
+    // le ricette si caricano solo quando servono (scheda Ricette o abbinamenti): all'avvio pesano troppo
     if (unsubRecipes) unsubRecipes();
+    unsubRecipes = null;
+    bodyCache.clear();
+    set({ recipes: [], recipesLoaded: false });
+    recipesPid = pid;
+    if (recipesWanted) cloud.watchRecipes();
+  },
+  watchRecipes() {
+    recipesWanted = true;
+    const pid = recipesPid || state.pantry?.id;
+    if (unsubRecipes || !pid || !fb) return;
+    const { db, F } = fb;
     unsubRecipes = F.onSnapshot(
       F.collection(db, 'pantries', pid, 'recipes'),
-      (snap) => set({ recipes: snap.docs.map((d) => ({ ...d.data(), id: d.id })), recipesError: '' }),
+      (snap) => {
+        const list = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+        set({ recipes: list, recipesError: '', recipesLoaded: true });
+        cloud.migrateRecipes(list);
+      },
       (e) => {
         console.error(e);
-        set({ recipesError: e?.code === 'permission-denied' ? 'rules' : 'other' });
+        set({ recipesError: e?.code === 'permission-denied' ? 'rules' : 'other', recipesLoaded: true });
       }
     );
+  },
+  // Ricette importate con la versione vecchia: sposto testo e foto in recipeBodies, così la lista resta leggera
+  async migrateRecipes(list) {
+    if (migrating || !navigator.onLine) return;
+    const heavy = list.filter((r) => r.instructions !== undefined || r.img !== undefined || r.notes !== undefined || r.text !== undefined);
+    if (!heavy.length) return;
+    migrating = true;
+    const { db, F } = fb;
+    const pid = recipesPid;
+    try {
+      for (let i = 0; i < heavy.length; i += 100) {
+        set({ recipesMigrating: heavy.length - i });
+        const batch = F.writeBatch(db);
+        for (const r of heavy.slice(i, i + 100)) {
+          batch.set(F.doc(db, 'pantries', pid, 'recipeBodies', r.id), { instructions: r.instructions || '', notes: r.notes || '', text: r.text || '', img: r.img || '' });
+          batch.update(F.doc(db, 'pantries', pid, 'recipes', r.id), { instructions: F.deleteField(), notes: F.deleteField(), text: F.deleteField(), img: F.deleteField(), hasImg: !!r.img });
+        }
+        await batch.commit();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      migrating = false;
+      set({ recipesMigrating: 0 });
+    }
+  },
+  async recipeBody(id) {
+    if (bodyCache.has(id)) return bodyCache.get(id);
+    const old = state.recipes.find((x) => x.id === id);
+    if (old && (old.instructions !== undefined || old.img !== undefined)) return { instructions: old.instructions || '', notes: old.notes || '', text: old.text || '', img: old.img || '' };
+    const { db, F } = fb;
+    const ref = F.doc(db, 'pantries', state.pantry.id, 'recipeBodies', id);
+    let snap = null;
+    try {
+      snap = await F.getDocFromCache(ref);
+    } catch {}
+    if (!snap || !snap.exists()) snap = await F.getDoc(ref);
+    const body = snap.exists() ? snap.data() : { instructions: '', notes: '', text: '', img: '' };
+    bodyCache.set(id, body);
+    return body;
   },
   async recipesPut(list) {
     const { db, F } = fb;
@@ -333,7 +402,13 @@ const cloud = {
     for (let i = 0; i < list.length; i += 200) {
       const batch = F.writeBatch(db);
       // merge: reimportando non si perde la stellina "salvata"
-      list.slice(i, i + 200).forEach((r) => batch.set(F.doc(db, 'pantries', pid, 'recipes', r.id), r, { merge: true }));
+      list.slice(i, i + 200).forEach((r) => {
+        // lista leggera in "recipes", testo e foto in "recipeBodies" (si leggono solo aprendo la ricetta)
+        const { instructions = '', notes = '', text = '', img = '', ...lean } = r;
+        batch.set(F.doc(db, 'pantries', pid, 'recipes', r.id), { ...lean, hasImg: !!img }, { merge: true });
+        batch.set(F.doc(db, 'pantries', pid, 'recipeBodies', r.id), { instructions, notes, text, img });
+        bodyCache.delete(r.id);
+      });
       await batch.commit();
     }
   },
@@ -345,12 +420,16 @@ const cloud = {
   async recipeRemove(id) {
     const { db, F } = fb;
     await F.deleteDoc(F.doc(db, 'pantries', state.pantry.id, 'recipes', id));
+    F.deleteDoc(F.doc(db, 'pantries', state.pantry.id, 'recipeBodies', id)).catch(() => {});
   },
   async recipesRemove(ids) {
     const { db, F } = fb;
-    for (let i = 0; i < ids.length; i += 400) {
+    for (let i = 0; i < ids.length; i += 200) {
       const batch = F.writeBatch(db);
-      ids.slice(i, i + 400).forEach((id) => batch.delete(F.doc(db, 'pantries', state.pantry.id, 'recipes', id)));
+      ids.slice(i, i + 200).forEach((id) => {
+        batch.delete(F.doc(db, 'pantries', state.pantry.id, 'recipes', id));
+        batch.delete(F.doc(db, 'pantries', state.pantry.id, 'recipeBodies', id));
+      });
       await batch.commit();
     }
   },
@@ -540,6 +619,8 @@ export const actions = {
   recipesPut: (list) => impl.recipesPut(list),
   recipeRemove: (id) => impl.recipeRemove(id),
   recipesRemove: (ids) => impl.recipesRemove(ids),
+  watchRecipes: () => impl.watchRecipes(),
+  recipeBody: (id) => impl.recipeBody(id),
   recipeUpdate: (id, patch) => impl.recipeUpdate(id, patch),
   savePush: cloud.savePush,
   removePush: cloud.removePush,

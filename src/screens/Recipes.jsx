@@ -46,6 +46,7 @@ export default function Recipes() {
   const [cat, setCat] = useState('');
   const [openId, setOpenId] = useState(null);
   const recipes = state.recipes || [];
+  useEffect(() => actions.watchRecipes(), []);
 
   const soonIds = useMemo(() => new Set(state.items.filter((i) => ['today', 'soon'].includes(expiryStatus(i.expiry, warnDays))).map((i) => i.id)), [state.items, warnDays]);
   const checked = useMemo(() => {
@@ -132,7 +133,10 @@ export default function Recipes() {
         </div>
       )}
 
-      {!recipes.length ? (
+      {state.recipesMigrating > 0 && <p className="small center blink">Sto alleggerendo le ricette per farle caricare più in fretta... ne mancano {state.recipesMigrating}</p>}
+      {!state.recipesLoaded ? (
+        <p className="center muted blink" style={{ marginTop: 20 }}>Carico le ricette...</p>
+      ) : !recipes.length ? (
         <div className="win stack">
           <b>Come portare le ricette da Mela</b>
           <ol className="small steps">
@@ -190,7 +194,7 @@ export default function Recipes() {
           <div className="recipe-list">
             {shown.slice(0, limit).map(({ r, c }) => (
               <button key={r.id} type="button" className="win flat recipe-card" onClick={() => setOpenId(r.id)}>
-                {r.img ? <img src={r.img} alt="" className="recipe-img" loading="lazy" decoding="async" /> : <span className="recipe-img ph"><Icon id="1f372" size={34} /></span>}
+                <RecipeThumb r={r} />
                 <span className="grow">
                   <span className="nm">
                     {r.saved && <span className="saved-star" aria-label="Salvata">★ </span>}
@@ -227,6 +231,15 @@ function RecipeSheet({ r, c, onClose }) {
   const [plan, setPlan] = useState(false);
   const [day, setDay] = useState(addDays(0));
   const [sure, setSure] = useState(false);
+  // testo e foto si leggono a parte, solo ora che la ricetta è aperta
+  const [body, setBody] = useState(r.instructions !== undefined || r.img ? { instructions: r.instructions || '', notes: r.notes || '', img: r.img || '' } : null);
+  useEffect(() => {
+    let on = true;
+    actions.recipeBody(r.id).then((b) => on && setBody(b)).catch(() => on && setBody({ instructions: '', notes: '', img: '' }));
+    return () => {
+      on = false;
+    };
+  }, [r.id]);
   // porzioni: la ricetta dice "4 persone"; se non lo dice, chiedo io per quante è
   const found = servingsOf(r.yield);
   const [base, setBase] = useState(found || 4);
@@ -277,7 +290,7 @@ function RecipeSheet({ r, c, onClose }) {
   return (
     <Sheet title={r.title} onClose={onClose}>
       <div className="stack">
-        {r.img && <img src={r.img} alt="" className="recipe-hero" />}
+        {body?.img ? <img src={body.img} alt="" className="recipe-hero" /> : r.hasImg && !body ? <div className="recipe-hero ph" aria-hidden="true" /> : null}
         {times.length > 0 && <p className="small muted">{times.join(' · ')}</p>}
         <Btn
           block
@@ -375,19 +388,20 @@ function RecipeSheet({ r, c, onClose }) {
           <p className="small center">I mancanti sono già nella lista della spesa.</p>
         ) : null}
 
-        {r.instructions && (
+        {!body && <p className="small muted center blink">Carico la preparazione...</p>}
+        {body?.instructions && (
           <>
             <SectionTitle icon="1f373">Preparazione</SectionTitle>
             <div className="recipe-text">
-              {r.instructions.split(/\r?\n/).filter((l) => l.trim()).map((l, i) => (/^#/.test(l) ? <h4 key={i}>{l.replace(/^#+\s*/, '')}</h4> : <p key={i}>{l}</p>))}
+              {body.instructions.split(/\r?\n/).filter((l) => l.trim()).map((l, i) => (/^#/.test(l) ? <h4 key={i}>{l.replace(/^#+\s*/, '')}</h4> : <p key={i}>{l}</p>))}
             </div>
           </>
         )}
-        {r.notes && (
+        {body?.notes && (
           <>
             <SectionTitle icon="1f4dd">Note</SectionTitle>
             <div className="recipe-text">
-              {r.notes.split(/\r?\n/).filter((l) => l.trim()).map((l, i) => <p key={i}>{l}</p>)}
+              {body.notes.split(/\r?\n/).filter((l) => l.trim()).map((l, i) => <p key={i}>{l}</p>)}
             </div>
           </>
         )}
@@ -435,4 +449,18 @@ function RemoveBook({ cat, ids, onDone }) {
   ) : (
     <Btn sm block style={{ marginBottom: 10 }} onClick={() => setSure(true)}>Togli tutte le ricette di questo libro ({ids.length})</Btn>
   );
+}
+
+// Miniatura: nelle ricette nuove sta a parte e la leggo solo per le card visibili
+function RecipeThumb({ r }) {
+  const [img, setImg] = useState(r.img || '');
+  useEffect(() => {
+    if (r.img || !r.hasImg) return;
+    let on = true;
+    actions.recipeBody(r.id).then((b) => on && setImg(b.img || '')).catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, [r.id, r.hasImg, r.img]);
+  return img ? <img src={img} alt="" className="recipe-img" loading="lazy" decoding="async" /> : <span className="recipe-img ph"><Icon id="1f372" size={34} /></span>;
 }
