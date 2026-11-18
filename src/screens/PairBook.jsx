@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { matchFood, norm } from '../catalog.js';
-import { getBook, importBook, removeBook, searchBook } from '../lib/pairbook.js';
+import { getBook, importBook, removeBook, removeSource, searchBook } from '../lib/pairbook.js';
 import { play } from '../lib/sound.js';
 import { Btn, Icon, useApp } from '../components/ui.jsx';
 
@@ -20,13 +20,18 @@ export function useHaveFn(items) {
   }, [items]);
 }
 
-export function BookTable({ t, has, open = true }) {
+const short = (n) => String(n || '').split(/[:(–-]/)[0].trim();
+
+export function BookTable({ t, has, open = true, sources }) {
+  const srcNames = sources ? (t.src || []).map((i) => short(sources[i]?.name)).filter(Boolean) : [];
+  const multi = sources && sources.length > 1;
   return (
     <div className="pb-table">
       <div className="pb-head">
         <b>{t.it}</b>
         {t.it !== t.en && <span className="small muted"> · {t.en}</span>}
         {t.p != null && <span className="small muted"> · pag. {t.p}</span>}
+        {srcNames.length > 0 && multi && <div className="small muted">{srcNames.join(' + ')}</div>}
       </div>
       {open && (
         <div className="pair-chips">
@@ -34,8 +39,9 @@ export function BookTable({ t, has, open = true }) {
             const f = matchFood(a.it);
             const ok = has(a.it);
             return (
-              <span key={i} className={'pair ' + (ok ? 'have' : '')} title={a.en}>
+              <span key={i} className={'pair ' + (ok ? 'have' : '') + (multi && a.src?.length > 1 ? ' multi' : '')} title={[a.en, sources && a.src ? a.src.map((j) => short(sources[j]?.name)).join(', ') : ''].filter(Boolean).join(' · ')}>
                 {f && <Icon id={f.icon} size={18} className="inline" />} {a.it}
+                {multi && a.src?.length > 1 && <span aria-label="in più libri"> ★</span>}
                 {ok && <span className="ok" aria-label="ce l'hai"> ✓</span>}
               </span>
             );
@@ -62,10 +68,10 @@ export default function PairBook() {
     e.target.value = '';
     if (!f) return;
     try {
-      const b = await importBook(f);
+      const { book: b, added } = await importBook(f);
       setBook(b);
       play('add');
-      toast(`${b.tables.length} ingredienti con i loro abbinamenti, salvati su questo dispositivo.`);
+      toast(`Aggiunto: ${added.map((x) => short(x.name)).join(', ')}. Ora ${b.tables.length} ingredienti (doppioni uniti), su questo dispositivo.`);
     } catch (err) {
       play('error');
       toast(err.message, { err: true });
@@ -86,12 +92,13 @@ export default function PairBook() {
         <>
           <input className="input" type="search" placeholder="Cerca un ingrediente: mela, cannella, apple..." value={q} onChange={(e) => (setQ(e.target.value), setOpenI(null))} aria-label="Cerca un ingrediente nel libro" />
           <p className="small muted" style={{ margin: '6px 0 10px' }}>
-            {book.tables.length} ingredienti · {book.fonte}
+            {book.tables.length} ingredienti da {book.sources.length === 1 ? short(book.sources[0].name) : `${book.sources.length} libri`}
+            {book.sources.length > 1 ? ' · ★ = consigliato da più libri' : ''}
           </p>
           <div className="stack">
             {results.map((t, i) => (
               <button key={i} type="button" className="win flat pb-row" onClick={() => setOpenI(openI === i ? null : i)} aria-expanded={openI === i || results.length === 1}>
-                <BookTable t={t} has={has} open={openI === i || results.length === 1 || norm(q) === norm(t.it)} />
+                <BookTable t={t} has={has} sources={book.sources} open={openI === i || results.length === 1 || norm(q) === norm(t.it)} />
               </button>
             ))}
             {!results.length && <p className="muted center">Nessun ingrediente trovato.</p>}
@@ -103,9 +110,15 @@ export default function PairBook() {
                 <Btn sm color="red" onClick={() => (removeBook(), setBook(null), setSure(false), toast('File tolto da questo dispositivo.'))}>Sì, togli</Btn>
               </div>
             ) : (
-              <div className="two">
-                <Btn sm onClick={() => fileRef.current?.click()}>Sostituisci il file</Btn>
-                <Btn sm onClick={() => setSure(true)}>Togli il file</Btn>
+              <div className="stack">
+                <Btn sm block icon="1f4e6" onClick={() => fileRef.current?.click()}>Aggiungi un altro file</Btn>
+                {book.sources.map((s) => (
+                  <div key={s.name} className="row pb-src">
+                    <span className="grow small">{s.name} ({s.tables.length})</span>
+                    <button type="button" className="shop-x" onClick={() => setBook(removeSource(s.name))} aria-label={`Togli ${s.name}`}>✕</button>
+                  </div>
+                ))}
+                <Btn sm block onClick={() => setSure(true)}>Togli tutti i file</Btn>
               </div>
             )}
           </div>

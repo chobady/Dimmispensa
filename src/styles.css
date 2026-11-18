@@ -665,3 +665,5 @@ body.no-scroll { overflow: hidden; }
 .pb-head b { font-family: var(--font-title); font-size: 11px; line-height: 1.6; }
 .seg button { min-width: 0; }
 @media (max-width: 480px) { .seg3 button img, .seg3 button .icon { display: none; } .seg3 button { padding-left: 4px; padding-right: 4px; } }
+.pair.multi { box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--yellow); }
+.pb-src { align-items: center; }

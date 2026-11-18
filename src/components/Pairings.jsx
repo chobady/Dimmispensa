@@ -3,7 +3,7 @@ import { actions } from '../lib/store.js';
 import { FLAVOR } from '../flavor-data.js';
 import { itemPairKeys, pairIcon, pairLabel, pairsFor } from '../lib/mela.js';
 import { Icon, useApp } from './ui.jsx';
-import { tablesFor } from '../lib/pairbook.js';
+import { getBook, tablesFor } from '../lib/pairbook.js';
 import { BookTable, useHaveFn } from '../screens/PairBook.jsx';
 
 // cibi del catalogo che nel Flavor Network hanno lo stesso "sapore" di un altro
@@ -70,9 +70,9 @@ export default function Pairings({ item }) {
       <b>Sta bene con</b>
       {book.length > 0 && (
         <>
-          <span className="small muted">Dal tuo libro degli abbinamenti</span>
+          <span className="small muted">Dai tuoi libri degli abbinamenti</span>
           {book.map((t, i) => (
-            <BookTable key={i} t={t} has={hasName} />
+            <BookTable key={i} t={t} has={hasName} sources={getBook()?.sources} />
           ))}
         </>
       )}
