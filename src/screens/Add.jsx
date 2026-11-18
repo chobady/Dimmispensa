@@ -362,6 +362,15 @@ function Barcode({ onDrafts }) {
     if (navigator.vibrate) navigator.vibrate(60);
     setStatus(`Letto ${code}, cerco il prodotto...`);
     try {
+      // prima i codici che la dispensa ha già imparato (detersivi, prodotti che non sono in nessun archivio...)
+      const known = state.barcodes?.[code];
+      if (known?.name) {
+        play('open');
+        setUnknown(null);
+        setStatus('');
+        setPreview({ draft: makeDraft({ name: known.name, brand: known.brand, qty: known.qty, unit: known.unit, foodKey: known.food, loc: known.loc, code }), note: 'lo conosco già: l\'hai registrato tu' });
+        return;
+      }
       let draft = await lookupBarcode(code);
       let online = false;
       if (!draft && isNorthAmerican(code)) {
@@ -403,6 +412,10 @@ function Barcode({ onDrafts }) {
   };
 
   const closePreview = (added) => {
+    if (added?.code) {
+      // ricordo il codice com'è stato confermato (anche se hai corretto il nome): la prossima volta è immediato
+      actions.codeSet(added.code, { name: added.name, brand: added.brand || '', food: added.food || 'altro', unit: added.unit || 'pz', qty: added.qty ?? 1, loc: added.loc || '', at: Date.now() });
+    }
     if (added) {
       play('add');
       onDrafts([added]);
@@ -523,7 +536,7 @@ function Barcode({ onDrafts }) {
     if (!unknownName.trim()) return;
     play('open');
     busyRef.current = true;
-    setPreview({ draft: makeDraft({ name: unknownName.trim() }), note: '' });
+    setPreview({ draft: makeDraft({ name: unknownName.trim(), code: unknown }), note: 'me lo ricordo: la prossima volta lo riconosco subito' });
     setUnknown(null);
   };
 
@@ -568,9 +581,9 @@ function Barcode({ onDrafts }) {
       {unknown && (
         <form className="win stack" onSubmit={addUnknown}>
           <p>
-            Il codice <b>{unknown}</b> non è nell'archivio di Open Food Facts{geminiKey ? ' e non l\'ho trovato neanche su internet' : ''}. Come si chiama il prodotto?
+            Il codice <b>{unknown}</b> non è negli archivi{geminiKey ? ' e non l\'ho trovato neanche su internet' : ''}. Come si chiama? Scrivilo una volta sola: me lo ricordo e la prossima volta lo riconosco subito (anche sui telefoni della famiglia).
           </p>
-          <input className="input" value={unknownName} onChange={(e) => setUnknownName(e.target.value)} placeholder="es. Yogurt greco Fage" autoFocus />
+          <input className="input" value={unknownName} onChange={(e) => setUnknownName(e.target.value)} placeholder="es. Ammorbidente Lenor, Yogurt greco Fage" autoFocus />
           <div className="two">
             <Btn onClick={() => setUnknown(null)}>Lascia stare</Btn>
             <Btn type="submit" color="green" sound={null} disabled={!unknownName.trim()}>Aggiungi</Btn>

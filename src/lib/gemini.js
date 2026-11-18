@@ -281,12 +281,14 @@ export async function readBarcodeDigits(key, base64, mime) {
 
 // Prodotto non presente in Open Food Facts: Gemini cerca il codice su Google
 export async function lookupBarcodeOnline(key, code) {
-  const prompt = `Cerca su internet il prodotto con codice a barre ${code} (EAN/UPC; può essere un prodotto italiano, europeo o statunitense).
+  const prompt = `Cerca su internet il prodotto con codice a barre ${code} (EAN/UPC; può essere un prodotto italiano, europeo o statunitense; può essere un cibo oppure un prodotto per la casa o per l'igiene: detersivo, ammorbidente, pastiglie lavastoviglie, carta, sapone, shampoo...).
+Cerca il codice anche su siti di supermercati e cataloghi di prodotti (es. "${code}" + ean).
 Rispondi SOLO con JSON, senza altro testo: {"trovato": true/false, "nome": "...", "marca": "...", "quantita": numero, "unita": "pz|conf|g|kg|ml|l", "tipo": "...", "macro": "proteine|carboidrati|grassi|fibre|nessuno", "kcal_100": n, "proteine_100": n, "carboidrati_100": n, "grassi_100": n}
 - Metti "trovato": true SOLO se le fonti indicano proprio questo codice. Non indovinare: se non sei sicuro, "trovato": false.
 - "nome": nome breve in italiano del prodotto (traducilo se è in inglese, es. "Peanut Butter" diventa "Burro di arachidi"), senza marca e senza quantità.
 - Converti once e libbre: "quantita" in g (1 oz = 28 g, 1 lb = 454 g) o in ml (1 fl oz = 30 ml).
-- "tipo": la chiave più adatta presa ESATTAMENTE da questo elenco, oppure "altro": ${TIPI}.`;
+- "tipo": la chiave più adatta presa ESATTAMENTE da questo elenco, oppure "altro": ${TIPI}.
+- Per i prodotti per la casa e l'igiene: "macro": "nessuno" e niente valori nutrizionali.`;
   const json = parseJSON(await generate(key, [{ text: prompt }], SCHEMA, true));
   if (!json || !json.trovato || !json.nome) return null;
   return makeDraft({ name: json.nome, brand: json.marca, qty: json.quantita, unit: json.unita, foodKey: json.tipo, macro: json.macro, nutr: { kcal: json.kcal_100, p: json.proteine_100, c: json.carboidrati_100, f: json.grassi_100 } });
