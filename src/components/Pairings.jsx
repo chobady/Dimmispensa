@@ -3,6 +3,8 @@ import { actions } from '../lib/store.js';
 import { FLAVOR } from '../flavor-data.js';
 import { itemPairKeys, pairIcon, pairLabel, pairsFor } from '../lib/mela.js';
 import { Icon, useApp } from './ui.jsx';
+import { tablesFor } from '../lib/pairbook.js';
+import { BookTable, useHaveFn } from '../screens/PairBook.jsx';
 
 // cibi del catalogo che nel Flavor Network hanno lo stesso "sapore" di un altro
 const ALIAS = { melaverde: 'mela', cosce: 'petto', alette: 'petto', pollointero: 'petto', cotoletta: 'petto', costata: 'bistecca', hamburger: 'macinato', spaghetti: 'farina', pasta: 'farina', baguette: 'pane', bastoncini: 'pesce', lattevegetale: 'latte', passata: 'pomodoro', pelati: 'pomodoro' };
@@ -57,12 +59,23 @@ export default function Pairings({ item }) {
     return out.slice(0, 10);
   }, [item.food, item.name, fromRecipes]);
   const have = useHave(state.items, item.id);
-  if (!fromRecipes.length && !fromAroma.length) return null;
+  const others = useMemo(() => state.items.filter((i) => i.id !== item.id), [state.items, item.id]);
+  const hasName = useHaveFn(others);
+  const book = useMemo(() => tablesFor(item, 1), [item.food, item.name]);
+  if (!fromRecipes.length && !fromAroma.length && !book.length) return null;
   const has = (key) => have.has(key) || (!key.includes(':') && [...have].some((h) => h.startsWith(key + ':')));
   const mine = [...fromRecipes, ...fromAroma].filter((p) => has(p.key)).length;
   return (
     <div className="pairings">
       <b>Sta bene con</b>
+      {book.length > 0 && (
+        <>
+          <span className="small muted">Dal tuo libro degli abbinamenti</span>
+          {book.map((t, i) => (
+            <BookTable key={i} t={t} has={hasName} />
+          ))}
+        </>
+      )}
       {fromRecipes.length > 0 && (
         <>
           <span className="small muted">Nelle tue {recipes.length} ricette di Mela</span>

@@ -10,6 +10,7 @@ import { play } from '../lib/sound.js';
 import { Btn, Icon, Sheet, Talk, useApp } from '../components/ui.jsx';
 import { byExpiry } from './Pantry.jsx';
 import Recipes from './Recipes.jsx';
+import PairBook from './PairBook.jsx';
 import { melaLink } from '../lib/mela.js';
 
 export const SLOTS = [
@@ -96,12 +97,15 @@ const reservedFor = (meals, itemId, fromDate, skipEntryId) => {
 
 function MealTabs({ tab, pick, nRecipes }) {
   return (
-    <div className="seg" role="tablist" aria-label="Pasti" style={{ marginBottom: 14 }}>
+    <div className="seg seg3" role="tablist" aria-label="Pasti" style={{ marginBottom: 14 }}>
       <button type="button" role="tab" aria-selected={tab === 'calendario'} className={tab === 'calendario' ? 'on' : ''} onClick={() => pick('calendario')}>
         <Icon id="1f4c5" size={20} /> Calendario
       </button>
       <button type="button" role="tab" aria-selected={tab === 'ricette'} className={tab === 'ricette' ? 'on' : ''} onClick={() => pick('ricette')}>
         <Icon id="1f372" size={20} /> Ricette {nRecipes ? `(${nRecipes})` : ''}
+      </button>
+      <button type="button" role="tab" aria-selected={tab === 'abbinamenti'} className={tab === 'abbinamenti' ? 'on' : ''} onClick={() => pick('abbinamenti')}>
+        <Icon id="2b50" size={20} /> Abbinamenti
       </button>
     </div>
   );
@@ -181,6 +185,14 @@ export default function Meals() {
     actions.setMealSlot(date, slot, list);
   };
 
+  if (tab === 'abbinamenti') {
+    return (
+      <>
+        <MealTabs tab={tab} pick={pickTab} nRecipes={(state.recipes || []).length} />
+        <PairBook />
+      </>
+    );
+  }
   if (tab === 'ricette') {
     return (
       <>
