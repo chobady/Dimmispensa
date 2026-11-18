@@ -151,17 +151,43 @@ export function searchBook(q, max = 50) {
 }
 
 // Le tabelle che parlano di questo cibo della dispensa
+// parole che descrivono come è il cibo, non cos'è ("ceci lessati" → ceci)
+const STATE = new Set('lessati lessate lesso lessi cotti cotte cotto cotta crudi crude crudo cruda freschi fresche fresco fresca secchi secche secco secca surgelati surgelate surgelato surgelata congelati congelato bio biologico biologici scatola barattolo vetro lattina precotti precotto sottolio sottaceto tritato tritata macinato macinata grattugiato grattugiata affettato affettata intero intera interi pelati polpa passata confezione busta vaschetta della delle dello degli del con per alla allo agli alle mio mia'.split(' '));
+const stem1 = (w) => (w.length >= 4 ? w.replace(/[aeio]$/, '') : w);
+const sameW = (a, b) => a === b || stem1(a) === stem1(b);
+const core = (s) => clean(s).split(' ').filter((w) => w.length > 1 && !STATE.has(w));
+
+// Le schede del libro per questo cibo: solo nomi uguali (anche singolare/plurale, senza "cotto", "lessati"...),
+// mai "parenti" dello stesso gruppo (i ceci non sono lenticchie)
 export function tablesFor(item, max = 2) {
   const ix = index();
   if (!ix) return [];
-  const name = norm(item.name || '').replace(/\([^)]*\)/g, '').trim();
-  const fOf = new Map(ix.map((x) => [x.t, x.f]));
-  const out = searchBook(name, 5).filter((t) => !item.food || item.food === 'altro' || !fOf.get(t) || fOf.get(t) === item.food);
-  if (!out.length && item.food && item.food !== 'altro') {
-    for (const x of ix) {
-      if (x.f === item.food && x.w.size <= 3) out.push(x.t);
-      if (out.length >= max) break;
+  const ws = core(item.name || '').filter((w) => w.length > 2);
+  const f = item.food && item.food !== 'altro' ? matchFood(clean(item.name || '')) : null;
+  const tries = [ws, ...ws.map((w) => [w])];
+  const single = (q) => q.length === 1 && ws.length > 1; // una parola sola presa dal nome: solo nomi identici
+  if (f) tries.push(core(f.name));
+  const named = ix.map((x) => ({ t: x.t, it: core(x.t.it), en: core(x.t.en) }));
+  for (const q of tries) {
+    if (!q.length) continue;
+    const exact = [];
+    const wider = [];
+    for (const x of named) {
+      for (const n of [x.it, x.en]) {
+        if (!n.length) continue;
+        if (n.length === q.length && q.every((w, i) => sameW(w, n[i]))) {
+          exact.push(x.t);
+          break;
+        }
+        // la scheda contiene tutte le parole cercate e inizia con la prima ("riso basmati" → "riso basmati cotto")
+        if (!single(q) && sameW(n[0], q[0]) && q.every((w) => n.some((v) => sameW(v, w)))) {
+          wider.push([n.length, x.t]);
+          break;
+        }
+      }
     }
+    if (exact.length) return exact.slice(0, max);
+    if (wider.length) return wider.sort((a, b) => a[0] - b[0]).map((x) => x[1]).slice(0, max);
   }
-  return out.slice(0, max);
+  return [];
 }
