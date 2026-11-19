@@ -3,6 +3,7 @@ import { isCasa, norm } from '../catalog.js';
 import { actions, cloudEnabled } from '../lib/store.js';
 import { addDays, expiryLabel, expiryStatus, fromISO } from '../lib/dates.js';
 import { newId } from '../lib/items.js';
+import WebRecipes from './WebRecipes.jsx';
 import { checkRecipe, cleanIngredient, melaLink, pantryIndex, readMelaFiles, scaleLine, servingsOf } from '../lib/mela.js';
 import { play } from '../lib/sound.js';
 import { Btn, Icon, SectionTitle, Sheet, Talk, useApp } from '../components/ui.jsx';
@@ -45,6 +46,7 @@ export default function Recipes() {
   const [filter, setFilter] = useState('tutte'); // tutte | ora | scadenza
   const [cat, setCat] = useState('');
   const [openId, setOpenId] = useState(null);
+  const [web, setWeb] = useState(false);
   const recipes = state.recipes || [];
   useEffect(() => actions.watchRecipes(), []);
 
@@ -148,13 +150,15 @@ export default function Recipes() {
             <input type="checkbox" checked={photos} onChange={(e) => setPhotos(e.target.checked)} /> Con le foto (solo una miniatura per ricetta)
           </label>
           <Btn color="yellow" block icon="1f4e6" onClick={() => fileRef.current?.click()} disabled={!!busy}>{busy || 'Importa da Mela'}</Btn>
+          <Btn block icon="1f517" onClick={() => setWeb(true)}>Ricette dal web (link o feed dei siti)</Btn>
           <p className="small muted">{cloudEnabled ? 'Le ricette restano condivise con chi usa la tua dispensa.' : 'Senza Firebase le ricette restano solo su questo dispositivo.'} Le foto grandi restano in Mela: qui salvo solo il testo e una miniatura (pochi KB a ricetta), quindi anche centinaia di ricette occupano pochissimo.</p>
         </div>
       ) : (
         <>
           <div className="row" style={{ marginBottom: 8 }}>
             <input className="input grow" type="search" placeholder="Cerca: pollo, torta, pasta..." value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cerca tra le ricette" />
-            <Btn sm icon="1f4e6" onClick={() => fileRef.current?.click()} disabled={!!busy} aria-label="Importa altre ricette da Mela">Importa</Btn>
+            <Btn sm icon="1f4e6" onClick={() => fileRef.current?.click()} disabled={!!busy} aria-label="Importa altre ricette da Mela">Mela</Btn>
+            <Btn sm icon="1f517" onClick={() => setWeb(true)} aria-label="Ricette dal web">Web</Btn>
           </div>
           <label className="opt-check small" style={{ marginBottom: 8 }}>
             <input type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} /> Importa solo le ricette nuove (più veloce)
@@ -220,6 +224,15 @@ export default function Recipes() {
         </>
       )}
 
+      {web && (
+        <WebRecipes
+          onClose={() => setWeb(false)}
+          onSaved={(id) => {
+            setWeb(false);
+            setOpenId(id);
+          }}
+        />
+      )}
       {open && <RecipeSheet r={open.r} c={open.c} onClose={() => setOpenId(null)} />}
     </>
   );
@@ -280,7 +293,7 @@ function RecipeSheet({ r, c, onClose }) {
   const remove = async () => {
     try {
       await actions.recipeRemove(r.id);
-      toast(`${r.title}: tolta (in Mela resta).`);
+      toast(`${r.title}: tolta${mela ? ' (in Mela resta)' : ''}.`);
       onClose();
     } catch (e) {
       toast(e.message || 'Non riesco a toglierla.', { err: true });

@@ -75,6 +75,29 @@ async function normalize(raw, by) {
   };
 }
 
+// Ricetta letta da un sito (api/ricetta o Gemini) → stesso formato delle ricette di Mela.
+// Il libro è il nome del sito, così si ritrovano tutte insieme.
+export async function fromWeb(d, by) {
+  return normalize(
+    {
+      id: d.link,
+      title: d.title,
+      text: d.text,
+      ingredients: d.ingredients,
+      instructions: d.instructions,
+      yield: d.yield,
+      prepTime: d.prepTime,
+      cookTime: d.cookTime,
+      totalTime: d.totalTime,
+      categories: [d.site].filter(Boolean),
+      link: d.link,
+      images: d.imageData ? [d.imageData] : [],
+    },
+    by
+  );
+}
+export const webId = (link) => idOf({ id: link });
+
 const isZip = (bytes) => bytes[0] === 0x50 && bytes[1] === 0x4b;
 const CHUNK = 4 * 1024 * 1024; // leggo il file a pezzi da 4 MB: un export con tante foto può pesare giga
 const concat = (parts) => {

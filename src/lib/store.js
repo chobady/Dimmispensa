@@ -42,6 +42,7 @@ let state = {
   recipesMigrating: 0,
   offers: {}, // offerte lette dai volantini: { id: { name, brand, price, oldPrice, size, until, store, food, icon } }
   flyerLinks: {}, // supermercati preferiti: { id: { name, url } }
+  feeds: {}, // siti di ricette seguiti: { id: { url, title, site } }
   barcodes: {}, // codici a barre imparati: { codice: { name, brand, food, unit, qty, loc } }
   shopping: {}, // { id: { id, name, qty, unit, food, icon, cat, done, by, addedAt } }
   finished: {}, // { chiave: { name, food, icon, unit, cat, at } } ultimi cibi finiti
@@ -86,7 +87,7 @@ const local = {
   start() {
     const meals = lsGet(LS_MEALS, {});
     oldMealDays(meals).forEach((d) => delete meals[d]);
-    set({ phase: 'ready', pantry: { id: 'local', name: 'La mia dispensa', local: true, geminiKey: lsGet(LS_KEY, ''), usdaKey: lsGet(LS_USDA, '') }, items: lsGet(LS_ITEMS, []), meals, shopping: lsGet(LS_SHOP, {}), finished: lsGet(LS_FIN, {}), offers: pruneOffers(lsGet('dm_offers', {})), flyerLinks: lsGet('dm_links', {}), barcodes: lsGet('dm_codes', {}), recipes: lsGet('dm_recipes', []) });
+    set({ phase: 'ready', pantry: { id: 'local', name: 'La mia dispensa', local: true, geminiKey: lsGet(LS_KEY, ''), usdaKey: lsGet(LS_USDA, '') }, items: lsGet(LS_ITEMS, []), meals, shopping: lsGet(LS_SHOP, {}), finished: lsGet(LS_FIN, {}), offers: pruneOffers(lsGet('dm_offers', {})), flyerLinks: lsGet('dm_links', {}), barcodes: lsGet('dm_codes', {}), feeds: lsGet('dm_feeds', {}), recipes: lsGet('dm_recipes', []) });
     window.addEventListener('storage', (e) => {
       if (e.key === LS_ITEMS) set({ items: lsGet(LS_ITEMS, []) });
       if (e.key === LS_MEALS) set({ meals: lsGet(LS_MEALS, {}) });
@@ -306,7 +307,7 @@ const cloud = {
       (snap) => {
         if (!snap.exists()) return;
         const data = snap.data();
-        set({ pantry: { id: pid, ...data }, meals: data.meals || {}, shopping: data.shopping || {}, finished: data.finished || {}, offers: data.offers || {}, flyerLinks: data.flyerLinks || {}, barcodes: data.barcodes || {}, phase: 'ready' });
+        set({ pantry: { id: pid, ...data }, meals: data.meals || {}, shopping: data.shopping || {}, finished: data.finished || {}, offers: data.offers || {}, flyerLinks: data.flyerLinks || {}, barcodes: data.barcodes || {}, feeds: data.feeds || {}, phase: 'ready' });
         // pulizia: i giorni più vecchi di 2 mesi vengono tolti (una volta per sessione)
         const old = oldMealDays(data.meals);
         const oldFin = oldFinished(data.finished);
@@ -601,6 +602,7 @@ export const actions = {
   offerSetMany: (pairs) => impl.mapSetMany('offers', pairs),
   linkSet: (id, value) => impl.mapSet('flyerLinks', id, value),
   codeSet: (code, value) => impl.mapSet('barcodes', String(code), value),
+  feedSet: (id, value) => impl.mapSet('feeds', id, value),
   // più voci insieme (es. "Metti in dispensa" o "Togli spuntati")
   shopSetMany: (pairs) => pairs.forEach(([id, v]) => impl.shopSet(id, v)),
   logFinished: (item) => {

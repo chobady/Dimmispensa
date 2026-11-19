@@ -669,3 +669,16 @@ body.no-scroll { overflow: hidden; }
 @media (max-width: 480px) { .seg3 button img, .seg3 button .icon { display: none; } .seg3 button { padding-left: 4px; padding-right: 4px; } }
 .pair.multi { box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--yellow); }
 .pb-src { align-items: center; }
+
+/* ricette dal web (feed) */
+.feed-list { display: flex; flex-direction: column; gap: 10px; }
+.feed-card { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 6px; }
+.feed-open { display: flex; gap: 10px; align-items: center; flex: 1; min-width: 0; text-align: left; font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.feed-open .grow { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.feed-open .nm { font-size: 17px; line-height: 1.2; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.feed-open .q { font-size: 15px; color: var(--muted, #6a6080); }
+.feed-img { width: 64px; height: 64px; flex: 0 0 64px; object-fit: cover; image-rendering: auto; box-shadow: 0 0 0 3px var(--ink); background: var(--paper-d, #e8e0c8); }
+.feed-img.ph { display: block; }
+.feed-saved { width: 34px; text-align: center; font-size: 20px; color: var(--green, #3a8a3a); }
+.web-ing { margin: 0; padding-left: 18px; }
+.web-ing li.hdr { list-style: none; margin-left: -18px; font-weight: bold; margin-top: 4px; }

@@ -340,3 +340,28 @@ export function fileToBase64(file) {
     r.readAsDataURL(file);
   });
 }
+
+// Ricetta da una pagina web che non pubblica i dati della ricetta: Gemini legge il testo della pagina
+export async function recipeFromPage(key, pageText, url) {
+  const prompt = `Questo è il testo di una pagina web (${url}). Se contiene una ricetta di cucina, estraila.
+Rispondi SOLO con JSON: {"ricetta": true/false, "titolo": "...", "descrizione": "...", "ingredienti": ["..."], "procedimento": ["passo 1", "passo 2"], "porzioni": "...", "preparazione": "...", "cottura": "..."}
+- "ingredienti": una riga per ingrediente con quantità, come scritto nella pagina (per i gruppi usa una riga "# Per l'impasto"). Lascia la lingua originale.
+- "procedimento": i passi nell'ordine, testo come nella pagina, senza numeri davanti.
+- "porzioni": es. "4 persone"; tempi come "20 minuti"; "" se non ci sono.
+- Non inventare niente: se la pagina non ha una ricetta, "ricetta": false.
+
+Testo della pagina:
+"""${String(pageText).slice(0, 18000)}"""`;
+  const j = parseJSON(await generate(key, [{ text: prompt }]));
+  if (!j || !j.ricetta || !Array.isArray(j.ingredienti) || !j.ingredienti.length) return null;
+  const arr = (v) => (Array.isArray(v) ? v : String(v || '').split('\n')).map((x) => String(x).trim()).filter(Boolean);
+  return {
+    title: String(j.titolo || '').trim(),
+    text: String(j.descrizione || '').trim(),
+    ingredients: arr(j.ingredienti),
+    instructions: arr(j.procedimento).join('\n'),
+    yield: String(j.porzioni || '').trim(),
+    prepTime: String(j.preparazione || '').trim(),
+    cookTime: String(j.cottura || '').trim(),
+  };
+}
