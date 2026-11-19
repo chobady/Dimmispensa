@@ -281,6 +281,8 @@ export const OTHER = { key: 'altro', name: 'Altro', icon: '1f4e6', cat: 'dispens
 const stem = (w) => (w.length > 4 ? w.replace(/[aeio]$/, '') : w);
 
 // Trova il cibo del catalogo che assomiglia di più a un testo libero ("mele golden", "Penne rigate Barilla"...)
+// riga che comincia con "farina" (anche dopo la quantità)
+export const FARINA_HEAD = /^\s*([\d.,/]+\s*(kg|g|gr|grammi|etti?|cucchia\w*|tazz\w*|bicchier\w*|cups?)?\s+)?(di\s+)?(farina|farine|flour)\b/;
 export function matchFood(text) {
   const t = ' ' + norm(text) + ' ';
   if (t.trim() === '') return null;
@@ -297,6 +299,8 @@ export function matchFood(text) {
       }
     }
   }
+  // "farina di mandorle" è farina (di un tipo), non mandorle
+  if (FARINA_HEAD.test(t) && BY_KEY.farina) best = BY_KEY.farina;
   // "Salsa coreana ai granchi", "Sugo al tonno": è un sugo, non granchio o tonno
   if (best && /^\s*(salsa|salse|sugo|sughetto|condimento|crema spalmabile)\b/.test(t) && !['pesto', 'sugo', 'maionese', 'ketchup', 'senape', 'soia', 'passata', 'pelati'].includes(best.key)) best = BY_KEY.sugo || best;
   return best;
@@ -457,7 +461,7 @@ const EN_KW = {
   aragosta: 'lobster',
   ostriche: 'oysters|scallops',
   latte: 'milk|whole milk|skim milk|2% milk',
-  lattevegetale: 'almond milk|oat milk|soy milk|plant milk|rice milk|coconut milk',
+  lattevegetale: 'latte di cocco|almond milk|oat milk|soy milk|plant milk|rice milk|coconut milk',
   yogurt: 'yogurt|yoghurt|greek yogurt',
   uova: 'egg|eggs',
   formaggio: 'cheese|cheddar|swiss cheese|gouda|feta|provolone|american cheese|cheese slices|monterey jack',
@@ -478,7 +482,8 @@ const EN_KW = {
   cracker: 'crackers|rusks|breadcrumbs',
   grissini: 'breadsticks',
   gallette: 'rice cakes|corn cakes',
-  farina: 'flour|cornmeal|semolina|cornstarch',
+  erbesecche: 'dried thyme|dried oregano|dried basil|dried parsley|dried rosemary|dried sage|dried marjoram|dried herbs|italian seasoning|herbes de provence|bay leaves',
+  farina: 'flour|cornmeal|semolina|cornstarch|almond flour|coconut flour|rice flour|chickpea flour|oat flour|rye flour|spelt flour|buckwheat flour|whole wheat flour|bread flour|all purpose flour|potato starch',
   cereali: 'cereal|cereals|corn flakes|granola|muesli|oats|oatmeal|porridge',
   noodles: 'ramen|udon|soba|rice noodles|instant noodles',
   croissant: 'croissant|croissants|pastry|pastries',
