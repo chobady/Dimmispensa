@@ -249,10 +249,18 @@ export function parseIngredient(line, key) {
   const junk = (clean.match(/[a-zà-ú]/gi) || []).length < 3; // righe tipo "1" rimaste dall'export
   const variant = food ? variantsIn(food.key, norm(clean)) : [];
   const kw = food ? kwIn(food, clean) : '';
-  const generic = !food || isGeneric(food, kw);
   // le spezie in generale le hai, ma l'anice o lo zafferano vanno comprati apposta
   const basic = !!(food && BASICS.has(food.key) && !(food.key === 'spezie' && variant.length));
-  return { line: clean, food: food || null, basic, variant, junk, kw, generic };
+  let generic = !food || isGeneric(food, kw);
+  let cuts = null;
+  let animals = null;
+  if (food && MEATY.has(food.cat)) {
+    // per carne e pesce decidono il taglio e l'animale, non la parola del catalogo
+    cuts = cutsIn(clean);
+    animals = animalsIn(clean);
+    if (cutsIn(kw).length || animalsIn(kw).length) generic = true;
+  }
+  return { line: clean, food: food || null, basic, variant, junk, kw, generic, cuts, animals };
 }
 
 // righe già analizzate, per non rifare il riconoscimento a ogni aggiornamento (con migliaia di ricette conta)
@@ -278,6 +286,82 @@ function fits(it, lineNorm) {
   return !d.length || d.some((x) => lineNorm.includes(x));
 }
 
+// ---- tagli e parti (carne e pesce) ----
+// "Fegato di maiale" non si fa con la rosticciana: se la riga nomina un taglio, serve quel taglio.
+// Le frattaglie e le parti particolari (fegato, piedini, trippa...) non valgono mai per una ricetta
+// che chiede l'animale in generale; un pezzo qualunque (bistecca, lonza) sì.
+const CUTS = [
+  // [nome, speciale, parole (inizio parola)]
+  ['fegato', 1, 'fegat|fegatin|fegatell'],
+  ['piedini', 1, 'piedin|piedi|zampett|zampin|peduccio|peducci'],
+  ['trippa', 1, 'trippa|trippe|centopelle|lampredott|abomaso'],
+  ['lingua', 1, 'lingua|lingue'],
+  ['cuore', 1, 'cuore'],
+  ['rognone', 1, 'rognon|reni\\b|rene\\b'],
+  ['cervello', 1, 'cervell'],
+  ['animelle', 1, 'animell'],
+  ['coda', 1, 'coda\\b|code\\b'],
+  ['orecchie', 1, 'orecchi'],
+  ['testina', 1, 'testina|testa\\b|teste\\b|muso\\b'],
+  ['cotenna', 1, 'cotenn|cotich'],
+  ['polmone', 1, 'polmon|coratella|corata'],
+  ['milza', 1, 'milza'],
+  ['frattaglie', 1, 'frattagli|interiora|ventrigl|durell|rigaglie'],
+  ['midollo', 1, 'midollo|ossa|osso buco'],
+  ['sangue', 1, 'sangue'],
+  ['costine', 0, 'rosticcian|costin|costolett|costole|puntine|puntina|spuntatur|ribs|spare ribs'],
+  ['lonza', 0, 'lonza|lonzino|arista|lombo|lombat|carre|carree|schiena'],
+  ['braciola', 0, 'braciol|nodin'],
+  ['filetto', 0, 'filett|medaglion|tenderloin'],
+  ['spalla', 0, 'spalla|spalle|capocollo'],
+  ['pancia', 0, 'pancia|ventresca|panciot'],
+  ['coscia', 0, 'coscia|cosce|cosciott|fusi\\b|fuselli|sovracosc'],
+  ['stinco', 0, 'stinc|ossobuc|garretto|muscolo'],
+  ['guancia', 0, 'guancia(?!l)|guance|guancett'],
+  ['petto', 0, 'petto|petti'],
+  ['ali', 0, 'ali\\b|alette|aletta'],
+  ['bistecca', 0, 'bistecc|tagliata|costata|fiorentina|entrecote|controfilett|scamone'],
+  ['fettine', 0, 'fettin|scaloppin|sottofesa|fesa|magatello|noce\\b|carpaccio|paillard'],
+  ['spezzatino', 0, 'spezzatin|gulasch|goulash'],
+  ['arrosto', 0, 'arrost|roast|girello|cappello del prete'],
+  ['bollito', 0, 'bollit|lesso|brasat|biancostato|reale\\b|punta di petto'],
+].map(([k, sp, w]) => ({ k, sp: !!sp, re: new RegExp(`(^| )(${w})`) }));
+const MEATY = new Set(['carne', 'pesce']);
+// l'animale: "fegato di vitello" non è "fegato di maiale"
+const ANIMALS = [
+  ['manzo', 'manzo|bovin|beef|scottona|vitellone|bue\\b|manzett'],
+  ['vitello', 'vitell|veal'],
+  ['maiale', 'maial|suin|porc|pork|maialin'],
+  ['pollo', 'poll|gallin|gallett|chicken'],
+  ['tacchino', 'tacchin|turkey'],
+  ['agnello', 'agnell|abbacchio|capretto|montone|pecora'],
+  ['coniglio', 'conigli'],
+  ['anatra', 'anatra|anatre|anitra|germano'],
+  ['oca', 'oca\\b|oche\\b'],
+  ['cinghiale', 'cinghial'],
+  ['cervo', 'cervo|capriolo|daino'],
+  ['cavallo', 'cavall|equin|puledro'],
+].map(([k, w]) => ({ k, re: new RegExp(`(^| )(${w})`) }));
+const animalsIn = (text) => {
+  const t = norm(text).replace(/[^a-z ]/g, ' ');
+  return ANIMALS.filter((a) => a.re.test(t));
+};
+// i tagli nominati in un testo
+export function cutsIn(text) {
+  const t = norm(text).replace(/[^a-z ]/g, ' ');
+  return CUTS.filter((c) => c.re.test(t));
+}
+// un cibo della dispensa va bene per una riga che chiede questi tagli?
+function cutFits(lineCuts, it, lineAnimals = []) {
+  const an = animalsIn(it.name);
+  if (lineAnimals.length && an.length && !an.some((a) => lineAnimals.includes(a))) return false;
+  const mine = cutsIn(it.name);
+  if (!lineCuts.length) return !mine.some((c) => c.sp); // "maiale": tutto tranne frattaglie e parti particolari
+  if (mine.some((c) => lineCuts.includes(c))) return true; // stesso taglio
+  // il cibo non dice il taglio ("Maiale"): va bene solo per i tagli normali
+  return !mine.length && !lineCuts.some((c) => c.sp);
+}
+
 // La dispensa indicizzata una volta per tutte le ricette
 export function pantryIndex(items, soonIds = new Set()) {
   const byFood = new Map();
@@ -288,7 +372,7 @@ export function pantryIndex(items, soonIds = new Set()) {
   }
   // per nome cerco solo tra i cibi fuori catalogo: "Tisana zenzero" (che è un tè) non è zenzero
   const names = items.filter((it) => !it.food || it.food === 'altro').map((it) => ({ it, n: norm(it.name), w: norm(it.name).replace(/[^a-z ]/g, ' ').split(' ').filter((x) => x.length > 3) }));
-  return { byFood, names, soonIds, byName: new Map(), byVariant: new Map(), byKind: new Map() };
+  return { byFood, names, soonIds, byName: new Map(), byVariant: new Map(), byKind: new Map(), byCut: new Map() };
 }
 
 // Confronto con la dispensa: cosa hai, cosa manca, quali cibi in scadenza usa
@@ -337,12 +421,18 @@ export function checkRecipe(recipe, idx) {
       if (!idx.byKind.has(k)) idx.byKind.set(k, found.filter((it) => hasKw(' ' + norm(it.name) + ' ', r.kw)));
       found = idx.byKind.get(k);
     }
+    if (r.cuts && found.length) {
+      // taglio preciso: fegato ≠ rosticciana, spezzatino ≠ bistecca
+      const k = `${r.food.key}@${r.cuts.map((c) => c.k).join(',')}@${r.animals.map((a) => a.k).join(',')}`;
+      if (!idx.byCut.has(k)) idx.byCut.set(k, found.filter((it) => cutFits(r.cuts, it, r.animals)));
+      found = idx.byCut.get(k);
+    }
     found = found.filter((it) => fits(it, ln));
     if (!found.length && !VARIANTS[r.food.key]) {
       // per i cibi fuori catalogo: nome uguale
       const w = norm(r.food.name).split(' ')[0];
       if (!idx.byName.has(w)) idx.byName.set(w, idx.names.filter((x) => w.length > 3 && x.w.some((n) => sameWord(n, w))).map((x) => x.it));
-      found = idx.byName.get(w).filter((it) => fits(it, ln));
+      found = idx.byName.get(w).filter((it) => fits(it, ln) && (!r.cuts || cutFits(r.cuts, it, r.animals)));
     }
     r.have = found.length > 0;
     r.items = found;
