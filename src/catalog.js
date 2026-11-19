@@ -44,13 +44,13 @@ const ROWS = [
   ['zucchina', 'Zucchine', 'zucchina', 'verdura', 'F', 7, 'pz', 'zucchini'],
   ['melanzana', 'Melanzane', '1f346', 'verdura', 'F', 7, 'pz', ''],
   ['peperone', 'Peperoni', '1fad1', 'verdura', 'F', 8, 'pz', ''],
-  ['peperoncino', 'Peperoncino', '1f336', 'verdura', 'F', 14, 'pz', '', 'cond'],
+  ['peperoncino', 'Peperoncino', '1f336', 'verdura', 'F', 14, 'pz', 'gochugaru|peperoncino coreano|peperoncino di sichuan', 'cond'],
   ['cetriolo', 'Cetrioli', '1f952', 'verdura', 'F', 7, 'pz', 'cetriolini'],
   ['broccoli', 'Broccoli', '1f966', 'verdura', 'F', 5, 'pz', 'broccolo|broccoletti'],
   ['friarielli', 'Friarielli', 'friarielli', 'verdura', 'F', 4, 'g', 'cime di rapa|broccoli di rapa|rapini'],
   ['cavolfiore', 'Cavolfiore', 'cavolfiore', 'verdura', 'F', 7, 'pz', 'cavolfiori'],
   ['finocchio', 'Finocchi', 'finocchio', 'verdura', 'F', 7, 'pz', ''],
-  ['funghi', 'Funghi', '1f344-200d-1f7eb', 'verdura', 'F', 5, 'g', 'fungo|champignon|porcini'],
+  ['funghi', 'Funghi', '1f344-200d-1f7eb', 'verdura', 'F', 5, 'g', 'fungo|champignon|porcini|shiitake|enoki|orecchie di giuda|funghi neri|funghi cinesi|pleurotus|maitake|shimeji'],
   ['mais', 'Mais', '1f33d', 'verdura', 'D', 365, 'conf', 'pannocchia|pannocchie'],
   ['avocado', 'Avocado', '1f951', 'verdura', 'F', 5, 'pz', ''],
   ['sedano', 'Sedano', 'sedano', 'verdura', 'F', 10, 'pz', ''],
@@ -139,7 +139,7 @@ const ROWS = [
   ['ricotta', 'Ricotta e formaggi freschi', 'ricotta', 'latticini', 'F', 5, 'g', 'ricotta|stracchino|crescenza|robiola|philadelphia|formaggio spalmabile|mascarpone|fiocchi di latte', 'prot'],
   ['burro', 'Burro', '1f9c8', 'latticini', 'F', 45, 'pz', 'margarina', 'cond'],
   ['panna', 'Panna', 'panna', 'latticini', 'F', 14, 'conf', 'panna da cucina|panna fresca|besciamella', 'cond'],
-  ['tofu', 'Tofu', 'tofu', 'latticini', 'F', 7, 'conf', 'tempeh|seitan', 'prot'],
+  ['tofu', 'Tofu', 'tofu', 'latticini', 'F', 7, 'conf', 'tempeh|seitan|tofu setoso|yuba', 'prot'],
   ['budino', 'Budino', '1f36e', 'dolci', 'F', 14, 'pz', 'budini|panna cotta|creme caramel|dessert'],
   // --- Pane, pasta e cereali ---
   ['pasta', 'Pasta', 'pasta', 'pane', 'D', 730, 'g', 'penne|fusilli|rigatoni|farfalle|maccheroni|orecchiette|paccheri|mezze maniche|pastina|ditalini'],
@@ -156,14 +156,14 @@ const ROWS = [
   ['gallette', 'Gallette', 'gallette', 'pane', 'D', 180, 'conf', 'galletta|gallette di riso|gallette di mais'],
   ['farina', 'Farina', 'farina', 'dispensa', 'D', 365, 'g', 'semola|amido|maizena|fecola|polenta'],
   ['cereali', 'Cereali', 'cereali', 'pane', 'D', 180, 'g', 'corn flakes|muesli|granola|fiocchi d avena|avena|porridge', 'extra'],
-  ['noodles', 'Noodles', '1f35c', 'pane', 'D', 365, 'conf', 'ramen|noodle|udon|soba|spaghetti di riso'],
+  ['noodles', 'Noodles', '1f35c', 'pane', 'D', 365, 'conf', 'ramen|noodle|udon|soba|spaghetti di riso|ramyeon|ramyun|spaghetti di soia|vermicelli di riso|tagliatelle di riso|noodles di riso|glass noodles|dangmyeon|harusame|shirataki|somen'],
   ['croissant', 'Cornetti', '1f950', 'dolci', 'D', 4, 'pz', 'cornetto|brioche|croissants|saccottino'],
   ['sandwich', 'Tramezzini', '1f96a', 'pronti', 'F', 2, 'pz', 'tramezzino|sandwich|toast|panino imbottito'],
   ['pancake', 'Pancake', '1f95e', 'dolci', 'F', 3, 'conf', 'pancakes|crepes|crepe|waffle'],
   // --- Scatolame e condimenti ---
   ['passata', 'Passata di pomodoro', 'passata', 'dispensa', 'D', 365, 'pz', 'passata|polpa di pomodoro|salsa di pomodoro|concentrato'],
   ['pelati', 'Pelati e scatolame', '1f96b', 'dispensa', 'D', 730, 'conf', 'pelati|scatoletta|scatolette|lattina di|in scatola'],
-  ['legumi', 'Legumi', '1fad8', 'dispensa', 'D', 730, 'g', 'fagioli|lenticchie|borlotti|cannellini|fave|edamame', 'prot'],
+  ['legumi', 'Legumi', '1fad8', 'dispensa', 'D', 730, 'g', 'fagioli|lenticchie|borlotti|cannellini|fave', 'prot'],
   ['ceci', 'Ceci', 'ceci', 'dispensa', 'D', 730, 'g', 'cece|ceci secchi|ceci lessati'],
   ['olio', 'Olio', 'olio', 'dispensa', 'D', 540, 'l', 'olio evo|olio extravergine|olio di oliva|olio di semi'],
   ['aceto', 'Aceto', 'aceto', 'dispensa', 'D', 730, 'pz', 'aceto balsamico|glassa'],
@@ -171,20 +171,45 @@ const ROWS = [
   ['pepe', 'Pepe', 'pepe', 'dispensa', 'S', 730, 'pz', ''],
   ['zucchero', 'Zucchero', 'zucchero', 'dispensa', 'D', 1095, 'g', 'zucchero di canna|dolcificante'],
   ['erbesecche', 'Erbe secche', 'erbesecche', 'dispensa', 'S', 365, 'conf', 'erbe secche|origano secco|timo secco|rosmarino secco|basilico secco|prezzemolo secco|salvia secca|maggiorana secca|erbe di provenza|erbe provenzali|foglie di alloro|alloro|mix di erbe|aromi secchi', 'cond'],
-  ['spezie', 'Spezie', 'spezie', 'dispensa', 'S', 365, 'pz', 'origano|paprika|curry|curcuma|cannella|noce moscata|cumino|anice|anice stellato|zafferano|chiodi di garofano|vaniglia|bacca di vaniglia|cardamomo|ginepro|bacche di ginepro|macis|pimento|sumac|garam masala|cinque spezie|semi di cumino|carvi'],
+  ['spezie', 'Spezie', 'spezie', 'dispensa', 'S', 365, 'pz', 'origano|paprika|curry|curcuma|cannella|noce moscata|cumino|anice|anice stellato|zafferano|chiodi di garofano|vaniglia|bacca di vaniglia|cardamomo|ginepro|bacche di ginepro|macis|pimento|sumac|garam masala|cinque spezie|semi di cumino|carvi|pepe di sichuan|shichimi|togarashi|cinque spezie cinesi'],
   ['dado', 'Dado e lievito', 'dado', 'dispensa', 'D', 365, 'conf', 'dado|dadi|lievito|bicarbonato'],
   ['brodo', 'Brodo pronto', 'brodo', 'dispensa', 'D', 365, 'l', 'brodo'],
   ['pesto', 'Pesto', 'pesto', 'dispensa', 'F', 30, 'pz', 'pesto alla genovese'],
   ['sugo', 'Sugo pronto', '1fad9', 'dispensa', 'D', 365, 'pz', 'sugo|sughi|ragu|sottoli|sottaceti|giardiniera|carciofini|capperi'],
-  ['maionese', 'Maionese', 'maionese', 'dispensa', 'F', 90, 'pz', 'mayo|salsa tonnata|salsa yogurt'],
+  ['maionese', 'Maionese', 'maionese', 'dispensa', 'F', 90, 'pz', 'mayo|salsa tonnata|salsa yogurt|kewpie|maionese giapponese'],
   ['ketchup', 'Ketchup', 'ketchup', 'dispensa', 'F', 180, 'pz', 'salsa barbecue|bbq|salsa piccante|tabasco'],
   ['senape', 'Senape', 'senape', 'dispensa', 'F', 180, 'pz', ''],
-  ['soia', 'Salsa di soia', 'soia', 'dispensa', 'D', 730, 'pz', 'salsa di soia|teriyaki|worcester'],
+  ['soia', 'Salsa di soia', 'soia', 'dispensa', 'D', 730, 'pz', 'salsa di soia|teriyaki|worcester|tamari|shoyu|salsa di soia scura|salsa di soia chiara'],
   ['miele', 'Miele', '1f36f', 'dispensa', 'D', 730, 'pz', 'sciroppo d acero'],
   ['marmellata', 'Marmellata', 'marmellata', 'dispensa', 'D', 365, 'pz', 'confettura|composta'],
   ['cremanocciola', 'Crema spalmabile', 'cremanocciola', 'dolci', 'D', 180, 'pz', 'nutella|crema di nocciole|crema al cioccolato|crema pistacchio'],
   ['caffe', 'Caffè', 'moka', 'bevande', 'D', 365, 'g', 'caffe macinato|capsule|cialde|orzo solubile'],
   ['te', 'Tè e tisane', '1f375', 'bevande', 'D', 730, 'conf', 'the|tè|tisana|tisane|camomilla|infuso'],
+  // --- Asia: Giappone, Cina, Corea ---
+  ['miso', 'Miso', 'miso', 'dispensa', 'F', 365, 'pz', 'pasta di miso|shiro miso|aka miso|miso bianco|miso rosso', 'cond'],
+  ['nori', 'Alga nori', 'nori', 'dispensa', 'D', 365, 'conf', 'alga nori|alghe nori|fogli di alga|fogli di nori|alga gim|gim'],
+  ['alghe', 'Alghe', 'alghe', 'dispensa', 'D', 365, 'conf', 'alga|kombu|wakame|hijiki|alga kombu|alga wakame|agar agar|agar', 'cond'],
+  ['wasabi', 'Wasabi', 'wasabi', 'dispensa', 'F', 180, 'pz', 'pasta di wasabi|rafano giapponese', 'cond'],
+  ['mirin', 'Mirin e sakè', 'mirin', 'dispensa', 'D', 365, 'pz', 'sake|sakè|vino di riso|vino shaoxing|shaoxing|vino cinese|soju|makgeolli', 'cond'],
+  ['panko', 'Panko', 'panko', 'pane', 'D', 180, 'g', 'pangrattato giapponese', 'cond'],
+  ['dashi', 'Dashi e bonito', 'dashi', 'dispensa', 'D', 365, 'conf', 'hondashi|brodo dashi|katsuobushi|bonito|fiocchi di bonito|bonito essiccato', 'cond'],
+  ['edamame', 'Edamame', 'edamame', 'verdura', 'Z', 365, 'g', 'fagioli di soia|soia edamame', 'prot'],
+  ['matcha', 'Matcha', 'matcha', 'bevande', 'D', 365, 'g', 'te matcha|tè matcha|matcha in polvere'],
+  ['onigiri', 'Onigiri', '1f359', 'pronti', 'F', 1, 'pz', 'polpette di riso giapponesi'],
+  ['mochi', 'Mochi', '1f361', 'dolci', 'F', 3, 'pz', 'daifuku|dango|mochi gelato'],
+  ['kamaboko', 'Kamaboko', '1f365', 'pesce', 'F', 7, 'conf', 'naruto|narutomaki|eomuk|odeng|tortino di pesce'],
+  ['ravioliasia', 'Ravioli cinesi', '1f95f', 'pronti', 'Z', 180, 'conf', 'gyoza|jiaozi|dumpling|dumplings|wonton|dim sum|ravioli al vapore|ravioli giapponesi|mandu|baozi|bao|xiaolongbao|shumai|siu mai'],
+  ['involtini', 'Involtini primavera', 'involtini', 'pronti', 'Z', 180, 'conf', 'involtino primavera|involtini cinesi|involtini vietnamiti'],
+  ['salsaasia', 'Salse asiatiche', 'salsaasia', 'dispensa', 'F', 365, 'pz', 'salsa di ostriche|salsa hoisin|hoisin|salsa di fagioli neri|doubanjiang|salsa xo|salsa char siu|olio al peperoncino|chili crisp|lao gan ma|salsa di pesce|nam pla|salsa ponzu|ponzu|salsa tonkatsu|salsa okonomiyaki|salsa sriracha', 'cond'],
+  ['oliosesamo', 'Olio di sesamo', 'oliosesamo', 'dispensa', 'D', 365, 'pz', 'olio di sesamo tostato', 'cond'],
+  ['sesamo', 'Semi di sesamo', 'sesamo', 'dispensa', 'D', 365, 'g', 'sesamo|semi di sesamo|sesamo nero|sesamo tostato|gomasio|furikake|tahina|tahin', 'cond'],
+  ['germogli', 'Germogli di soia', 'germogli', 'verdura', 'F', 3, 'g', 'germogli|germogli di fagioli mung|fagioli mung'],
+  ['pakchoi', 'Pak choi', 'pakchoi', 'verdura', 'F', 5, 'pz', 'bok choy|pak choy|cavolo cinese|cavolo napa|napa'],
+  ['bambu', 'Germogli di bambù', 'bambu', 'verdura', 'D', 365, 'conf', 'bambu|bambù|germogli di bambu|germogli di bambù'],
+  ['cartadiriso', 'Carta di riso', 'cartadiriso', 'pane', 'D', 365, 'conf', 'fogli di riso|sfoglie di riso|pasta per wonton|pasta per gyoza|dischi per gyoza|sfoglie per ravioli cinesi'],
+  ['kimchi', 'Kimchi', 'kimchi', 'verdura', 'F', 90, 'pz', 'kimchee|kimchi di cavolo', 'cond'],
+  ['gochujang', 'Gochujang', 'gochujang', 'dispensa', 'F', 365, 'pz', 'pasta di peperoncino coreana|doenjang|ssamjang|pasta di soia coreana', 'cond'],
+  ['tteok', 'Tteok', 'tteok', 'pane', 'F', 7, 'g', 'tteokbokki|topokki|gnocchi di riso|gnocchetti di riso coreani'],
   // --- Dolci e snack ---
   ['biscotti', 'Biscotti', '1f36a', 'dolci', 'D', 120, 'g', 'biscotto|frollini|cookies|wafer|savoiardi'],
   ['cioccolato', 'Cioccolato', '1f36b', 'dolci', 'D', 180, 'pz', 'cioccolata|tavoletta|cioccolatini|barretta|barrette|cacao'],
@@ -206,7 +231,7 @@ const ROWS = [
   ['birra', 'Birra', '1f37a', 'bevande', 'F', 180, 'pz', 'birre'],
   ['vino', 'Vino', '1f377', 'bevande', 'D', 730, 'pz', 'vino rosso|vino bianco|rosato'],
   ['spumante', 'Spumante', '1f37e', 'bevande', 'D', 730, 'pz', 'prosecco|champagne|bollicine'],
-  ['liquore', 'Liquori', '1f943', 'bevande', 'D', 3650, 'pz', 'amaro|grappa|whisky|rum|gin|vodka|limoncello|aperol|campari'],
+  ['liquore', 'Liquori', 'liquore', 'bevande', 'D', 3650, 'pz', 'amaro|grappa|whisky|rum|gin|vodka|limoncello|aperol|campari'],
   // --- Piatti pronti e avanzi ---
   ['avanzi', 'Avanzi', 'avanzi', 'pronti', 'F', 3, 'pz', 'avanzo|avanzato|contenitore|schiscetta'],
   ['zuppa', 'Zuppa', '1f372', 'pronti', 'F', 3, 'conf', 'minestrone|vellutata|minestra|passato di verdure|stufato'],
@@ -302,7 +327,7 @@ export function matchFood(text) {
   // "farina di mandorle" è farina (di un tipo), non mandorle
   if (FARINA_HEAD.test(t) && BY_KEY.farina) best = BY_KEY.farina;
   // "Salsa coreana ai granchi", "Sugo al tonno": è un sugo, non granchio o tonno
-  if (best && /^\s*(salsa|salse|sugo|sughetto|condimento|crema spalmabile)\b/.test(t) && !['pesto', 'sugo', 'maionese', 'ketchup', 'senape', 'soia', 'passata', 'pelati'].includes(best.key)) best = BY_KEY.sugo || best;
+  if (best && /^\s*(salsa|salse|sugo|sughetto|condimento|crema spalmabile)\b/.test(t) && !['pesto', 'sugo', 'maionese', 'ketchup', 'senape', 'soia', 'passata', 'pelati', 'salsaasia'].includes(best.key)) best = BY_KEY.sugo || best;
   return best;
 }
 
@@ -539,6 +564,30 @@ const EN_KW = {
   hummus: 'guacamole|salsa|dip',
   falafel: 'veggie burger|plant-based burger|plant based burger',
   pizzasurgelata: 'frozen pizza',
+  miso: 'miso paste|white miso|red miso',
+  nori: 'nori|seaweed sheets|roasted seaweed|sushi nori|laver',
+  alghe: 'seaweed|kelp|kombu|wakame|hijiki|agar',
+  wasabi: 'wasabi paste',
+  mirin: 'mirin|sake|rice wine|shaoxing wine|cooking wine|soju|makgeolli',
+  panko: 'panko|panko breadcrumbs',
+  dashi: 'dashi|hondashi|bonito flakes',
+  edamame: 'edamame|soybeans',
+  matcha: 'matcha|matcha powder|green tea powder',
+  onigiri: 'rice ball|rice balls',
+  mochi: 'mochi|dango|daifuku',
+  kamaboko: 'fish cake|fish cakes',
+  ravioliasia: 'dumplings|potstickers|gyoza|wontons|bao buns|steamed buns|dim sum',
+  involtini: 'spring rolls|egg rolls',
+  salsaasia: 'oyster sauce|hoisin sauce|hoisin|black bean sauce|chili crisp|chili oil|xo sauce|fish sauce|ponzu|tonkatsu sauce',
+  oliosesamo: 'sesame oil|toasted sesame oil',
+  sesamo: 'sesame seeds|sesame|tahini|furikake',
+  germogli: 'bean sprouts|mung bean sprouts|sprouts',
+  pakchoi: 'bok choy|pak choi|napa cabbage|chinese cabbage',
+  bambu: 'bamboo shoots|bamboo',
+  cartadiriso: 'rice paper|spring roll wrappers|wonton wrappers|dumpling wrappers|gyoza wrappers',
+  kimchi: 'kimchi',
+  gochujang: 'gochujang|doenjang|ssamjang|korean chili paste',
+  tteok: 'tteok|tteokbokki|korean rice cakes|topokki',
 };
 
 // Macronutriente principale di ogni cibo del catalogo
@@ -550,10 +599,10 @@ export const MACROS = [
 ];
 const CAT_MACRO = { verdura: 'fibre', frutta: 'carboidrati', carne: 'proteine', pesce: 'proteine', latticini: 'proteine', pane: 'carboidrati', dolci: 'carboidrati' };
 const MACRO_OVERRIDE = {};
-for (const k of 'olive avocado noci mandorle arachidi pancetta salame burro panna olio maionese cremanocciola patatine pesto cocco'.split(' ')) MACRO_OVERRIDE[k] = 'grassi';
-for (const k of 'patata patatadolce mais castagne piselli patatinefritte budino zucchero miele marmellata farina pizza pizzasurgelata sandwich pancake croissant succo bibita gelato ghiaccioli'.split(' ')) MACRO_OVERRIDE[k] = 'carboidrati';
-for (const k of 'legumi ceci tofu hummus falafel uova'.split(' ')) MACRO_OVERRIDE[k] = 'proteine';
-for (const k of 'sale pepe spezie dado brodo aceto soia senape ketchup acqua caffe te birra vino spumante liquore erbe aglio zenzero peperoncino passata sugo pelati lattevegetale'.split(' ')) MACRO_OVERRIDE[k] = 'nessuno';
+for (const k of 'olive avocado noci mandorle arachidi pancetta salame burro panna olio maionese cremanocciola patatine pesto cocco oliosesamo sesamo'.split(' ')) MACRO_OVERRIDE[k] = 'grassi';
+for (const k of 'onigiri mochi ravioliasia involtini tteok panko cartadiriso patata patatadolce mais castagne piselli patatinefritte budino zucchero miele marmellata farina pizza pizzasurgelata sandwich pancake croissant succo bibita gelato ghiaccioli'.split(' ')) MACRO_OVERRIDE[k] = 'carboidrati';
+for (const k of 'legumi ceci tofu hummus falafel uova edamame'.split(' ')) MACRO_OVERRIDE[k] = 'proteine';
+for (const k of 'sale pepe spezie dado brodo aceto soia senape ketchup acqua caffe te birra vino spumante liquore erbe aglio zenzero peperoncino passata sugo pelati lattevegetale miso nori alghe wasabi mirin dashi matcha salsaasia gochujang kimchi'.split(' ')) MACRO_OVERRIDE[k] = 'nessuno';
 for (const k of 'zuppa insalatapronta verduresurgelate'.split(' ')) MACRO_OVERRIDE[k] = 'fibre';
 
 for (const f of CATALOG) {
