@@ -19,7 +19,8 @@
   --orange: #f08a24;
   --px: 4px;
   --font-title: 'Press Start 2P', monospace;
-  --font-body: 'Pixelify Sans', system-ui, sans-serif;
+  /* pixel ma con minuscole e numeri chiari (Pixelify confondeva 5/8, l/1) */
+  --font-body: 'Jersey 15', system-ui, sans-serif;
   --nav-h: 76px;
 }
 
@@ -28,7 +29,8 @@ html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
   font-family: var(--font-body);
-  font-size: 18px;
+  font-size: 19px;
+  font-synthesis: none; /* Jersey ha un solo spessore: niente grassetto finto, impasta le lettere */
   line-height: 1.3;
   color: var(--ink);
   background: var(--shell-d);
@@ -45,7 +47,7 @@ img.px { image-rendering: pixelated; image-rendering: crisp-edges; display: bloc
 h1, h2, h3, p { margin: 0; }
 .title { font-family: var(--font-title); font-size: 12px; line-height: 1.5; letter-spacing: 0; }
 .muted { color: var(--ink-soft); }
-.small { font-size: 15px; }
+.small { font-size: 16px; }
 .row { display: flex; align-items: center; gap: 10px; }
 .wrap { flex-wrap: wrap; }
 .grow { flex: 1; min-width: 0; }
