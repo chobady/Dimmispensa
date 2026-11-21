@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { isCasa, norm } from '../catalog.js';
 import { actions, cloudEnabled } from '../lib/store.js';
 import { addDays, expiryLabel, expiryStatus, fromISO } from '../lib/dates.js';
-import { newId } from '../lib/items.js';
+import { newId, qtyLabel } from '../lib/items.js';
 import WebRecipes from './WebRecipes.jsx';
-import { checkRecipe, cleanIngredient, melaLink, pantryIndex, readMelaFiles, scaleLine, servingsOf } from '../lib/mela.js';
+import { checkRecipe, cleanIngredient, melaLink, pantryIndex, qtyOf, readMelaFiles, scaleLine, servingsOf } from '../lib/mela.js';
 import { play } from '../lib/sound.js';
 import { Btn, Icon, SectionTitle, Sheet, Talk, useApp } from '../components/ui.jsx';
 import { SLOTS } from './Meals.jsx';
@@ -266,15 +266,24 @@ function RecipeSheet({ r, c, onClose }) {
   const toBuy = c.missing.filter((m) => !listKeys.has(buyKey(m)));
   const addMissing = () => {
     const now = Date.now();
-    const seen = new Set();
+    const byKey = new Map();
     const pairs = [];
     toBuy.forEach((m, i) => {
-      const k = buyKey(m);
-      if (seen.has(k)) return;
-      seen.add(k);
+      const bk = buyKey(m);
+      // quantità della riga, già per le persone scelte
+      const q = qtyOf(m.line, k) || {};
+      const prev = byKey.get(bk);
+      if (prev) {
+        // lo stesso ingrediente due volte nella ricetta: sommo se l'unità è la stessa
+        if (q.qty && prev.unit === q.unit) prev.qty = Math.round((prev.qty + q.qty) * 100) / 100;
+        else if (q.text || q.qty) prev.qtyText = [prev.qtyText || (prev.qty ? qtyLabel(prev) : ''), q.text || qtyLabel(q)].filter(Boolean).join(' + ');
+        return;
+      }
       const id = newId();
       const name = m.food ? m.food.name : cleanIngredient(m.line).replace(/^\w/, (ch) => ch.toUpperCase());
-      pairs.push([id, { id, name, qty: null, unit: null, food: m.food ? m.food.key : 'altro', icon: m.food ? m.food.icon : '1f4e6', cat: m.food ? m.food.cat : 'dispensa', done: false, by: me, addedAt: now + i, note: r.title.slice(0, 60) }]);
+      const item = { id, name, qty: q.qty || null, unit: q.qty ? q.unit : null, qtyText: q.text || null, food: m.food ? m.food.key : 'altro', icon: m.food ? m.food.icon : '1f4e6', cat: m.food ? m.food.cat : 'dispensa', done: false, by: me, addedAt: now + i, note: r.title.slice(0, 60) };
+      byKey.set(bk, item);
+      pairs.push([id, item]);
     });
     actions.shopSetMany(pairs);
     play('add');

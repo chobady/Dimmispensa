@@ -537,6 +537,46 @@ export function scaleLine(line, k) {
   return { text: line, changed: false };
 }
 
+// ---- quantità per la lista della spesa ----
+// "600 g di baccalà" → 600 g; "2 uova" → ×2; "2 cucchiai di miso" → testo "2 cucchiai" (non si compra a cucchiai).
+// k = porzioni scelte / porzioni della ricetta.
+const WORDN = { un: 1, uno: 1, una: 1, "un'": 1, mezzo: 0.5, mezza: 0.5, due: 2, tre: 3, quattro: 4, cinque: 5, sei: 6, a: 1, an: 1, one: 1, two: 2, three: 3, half: 0.5 };
+const MEASURE = /^(cucchiai\w*|cucchiain\w*|cucchiaio|tazz\w*|bicchier\w*|pizzic\w*|spicch\w*|mazz\w*|ciuff\w*|fogli\w*|rametti?|rametto|manciat\w*|noce|noci|fett\w*|bustin\w*|vasett\w*|scatol\w*|lattin\w*|confezion\w*|panett\w*|cubett\w*|gambi?|gambo|cespi?|cespo|tbsp|tsp|tablespoons?|teaspoons?|cups?|cloves?|pinch|bunch|slices?|cans?|sprigs?|handful)$/i;
+export function qtyOf(line, k = 1) {
+  const t = String(line || '').trim().replace(/^[-•*]\s*/, '');
+  if (!t || /^#/.test(t)) return null;
+  let m = t.match(new RegExp(`^${NUM}(?:\\s*[-–]\\s*${NUM})?\\s*`, 'i'));
+  let n;
+  let rest;
+  if (m) {
+    n = toN(m[2] || m[1]); // "1-2" → 2
+    rest = t.slice(m[0].length);
+  } else {
+    const w = t.match(/^(un'|\p{L}+)\s+/u);
+    if (!w || !(w[1].toLowerCase() in WORDN)) return null;
+    n = WORDN[w[1].toLowerCase()];
+    rest = t.slice(w[0].length);
+  }
+  if (!Number.isFinite(n) || n <= 0) return null;
+  n *= k || 1;
+  const u = rest.match(/^(kg|g|gr|grammi|ml|cl|dl|l|lt|litr[oi]|oz|ounces?|lbs?|pounds?)\b\.?/i);
+  if (u) {
+    const x = u[1].toLowerCase();
+    if (/^(g|gr|grammi)$/.test(x)) return n >= 1000 ? { qty: round2(n / 1000), unit: 'kg' } : { qty: Math.round(n), unit: 'g' };
+    if (x === 'kg') return { qty: round2(n), unit: 'kg' };
+    if (x === 'ml') return n >= 1000 ? { qty: round2(n / 1000), unit: 'l' } : { qty: Math.round(n), unit: 'ml' };
+    if (x === 'cl') return { qty: Math.round(n * 10), unit: 'ml' };
+    if (x === 'dl') return { qty: Math.round(n * 100), unit: 'ml' };
+    if (/^(l|lt|litr)/.test(x)) return { qty: round2(n), unit: 'l' };
+    if (/^(oz|ounce)/.test(x)) return { qty: Math.round(n * 28), unit: 'g' };
+    return { qty: Math.round(n * 454), unit: 'g' }; // libbre
+  }
+  const w = (rest.match(/^\p{L}+/u) || [''])[0];
+  if (MEASURE.test(w)) return { text: `${fmtQty(n, '')} ${w}` };
+  return { qty: Math.ceil(n - 1e-9), unit: 'pz' }; // pezzi: "2 uova", "mezzo limone" → 1
+}
+const round2 = (n) => Math.round(n * 100) / 100;
+
 // ---- abbinamenti: cosa compare spesso insieme nelle TUE ricette ----
 // Chiave di un ingrediente: il cibo del catalogo, più preciso se la riga nomina un tipo (spezie → cannella).
 const pairKey = (food, kw, generic) => (generic || !kw ? food.key : `${food.key}:${kw}`);

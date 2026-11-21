@@ -42,7 +42,7 @@ const runningLow = (i) => {
   return q <= 1;
 };
 
-const shopLabel = (s) => (s.qty ? qtyLabel({ qty: s.qty, unit: s.unit }) : '');
+const shopLabel = (s) => (s.qtyText ? s.qtyText : s.qty ? qtyLabel({ qty: s.qty, unit: s.unit }) : '');
 
 export default function Shopping() {
   const { state, toast } = useApp();
@@ -132,7 +132,7 @@ export default function Shopping() {
   };
 
   const share = async () => {
-    const lines = todo.map((s) => `- ${s.name}${s.qty ? ' (' + shopLabel(s) + ')' : ''}`).join('\n');
+    const lines = todo.map((s) => `- ${s.name}${shopLabel(s) ? ' (' + shopLabel(s) + ')' : ''}`).join('\n');
     const msg = `Lista della spesa:\n${lines}`;
     try {
       if (navigator.share) await navigator.share({ text: msg });
@@ -164,10 +164,10 @@ export default function Shopping() {
         <Icon id={s.icon} size={30} />
         <span className="grow">
           <span className="nm">{s.name}</span>
-          {(s.qty || (s.by && s.by !== me)) && (
+          {(shopLabel(s) || (s.by && s.by !== me)) && (
             <span className="q">
               {shopLabel(s)}
-              {s.qty && s.by && s.by !== me ? ' · ' : ''}
+              {shopLabel(s) && s.by && s.by !== me ? ' · ' : ''}
               {s.by && s.by !== me ? `da ${s.by}` : ''}
             </span>
           )}
