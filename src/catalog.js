@@ -274,6 +274,7 @@ const ROWS = [
   ['insetticida', 'Insetticida', 'insetticida', 'casa', 'C', 0, 'pz', 'insetticida|antizanzare|zampironi|piastrine zanzare|vape|raid|baygon|trappole formiche'],
   ['pile', 'Pile', 'pile', 'casa', 'C', 0, 'conf', 'pile|batterie|pila|batteria|pile stilo|pile ministilo|duracell'],
   ['lampadina', 'Lampadine', 'lampadina', 'casa', 'C', 0, 'pz', 'lampadina|lampadine|led|faretto|faretti'],
+  ['legna', 'Legna da ardere', 'legna', 'casa', 'C', 0, 'conf', 'legna|legna da ardere|legna per camino|ciocchi|ceppi|ceppo|pellet|carbonella|bricchetti|tronchi|tronco|fascine|legnetti'],
   ['fiammiferi', 'Fiammiferi e accendini', 'fiammiferi', 'casa', 'C', 0, 'pz', 'fiammiferi|accendino|accendini|accendigas|accendifuoco|diavolina'],
 ];
 
@@ -382,6 +383,7 @@ const EN_KW = {
   pile: 'batteries|battery',
   lampadina: 'light bulb|light bulbs|led bulbs',
   fiammiferi: 'matches|lighter|lighters',
+  legna: 'firewood|wood pellets|pellets|charcoal|logs|kindling',
   salelavastoviglie: 'dishwasher salt',
   detersivopiatti: 'dishwashing liquid|dishwashing liquids|dish soap|washing up liquid',
   spugne: 'sponge|sponges|cleaning cloths|microfiber cloths',
