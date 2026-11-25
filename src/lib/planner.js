@@ -604,7 +604,7 @@ export function planDay({ items, person = {}, only = null, seed = {}, keep = nul
   for (const meal of MEALS) {
     if (!meals.includes(meal)) continue;
     const s = seed[meal] || 0;
-    const t = { kcal: T.kcal * share[meal], p: T.protein * share[meal], c: T.carbs * share[meal] };
+    const t = { kcal: T.kcal * share[meal], p: T.protein * share[meal], c: T.carbs * share[meal], f: T.fat * share[meal], share: share[meal] };
     let lines;
     const why = [];
     if (meal === 'Colazione') {
@@ -699,7 +699,7 @@ export function planDay({ items, person = {}, only = null, seed = {}, keep = nul
     checks.push({ ok: fruits >= 2, txt: `Frutta ${fruits} porzioni (${MN} 2-3, ${PN} 2)` });
     checks.push({ ok: day.fib >= 25, txt: `Fibre circa ${Math.round(day.fib)} g (${MN}: almeno 25)` });
   }
-  return { date, targets: T, pasti: all, day, vegG, fruits, buy, blocked, checks, only: fullDay ? null : only };
+  return { date, targets: T, pasti: all, day, vegG, fruits, buy, blocked, checks, only: fullDay ? null : all.map((m) => m.pasto) };
 }
 
 // ---------------------------------------------------------------------------

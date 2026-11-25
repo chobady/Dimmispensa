@@ -599,13 +599,28 @@ export default function DayAdvice({ compact = false, page = false }) {
               </Btn>
             )}
             {plan.local ? (
-              <div className="plan-tot">
-                <Meter label="Calorie" value={plan.kcal_tot} unit="kcal" target={plan.raw.only ? null : plan.obiettivo.kcal} />
-                <Meter label="Proteine" value={plan.proteine_tot} target={plan.raw.only ? null : plan.obiettivo.p} />
-                <Meter label="Carboidrati" value={plan.carboidrati_tot} target={plan.raw.only ? null : plan.obiettivo.c} />
-                <Meter label="Grassi" value={plan.grassi_tot} target={plan.raw.only ? null : plan.obiettivo.f} />
-                <Meter label="Verdure" value={plan.verdure_tot} target={plan.raw.only ? null : 400} />
-              </div>
+              (() => {
+                // solo alcuni pasti: confronto con la loro parte della giornata, non con il totale
+                const part = plan.raw.only ? plan.raw.pasti.filter((m) => plan.raw.only.includes(m.pasto)) : null;
+                const tg = part
+                  ? part.reduce((t, m) => ({ kcal: t.kcal + m.target.kcal, p: t.p + m.target.p, c: t.c + m.target.c, f: t.f + (m.target.f || 0), share: t.share + (m.target.share || 0) }), { kcal: 0, p: 0, c: 0, f: 0, share: 0 })
+                  : { ...plan.obiettivo, share: 1 };
+                return (
+                  <>
+                    <p className="small">
+                      <b>{part ? `Valori ${part.length === 1 ? 'di questo pasto' : 'di questi pasti'} (${part.map((m) => m.pasto.toLowerCase()).join(', ')})` : 'Totale della giornata'}</b>
+                      {part ? `: confrontati con ${part.length === 1 ? 'la sua' : 'la loro'} parte della giornata, il ${Math.round(tg.share * 100)}% di ${plan.obiettivo.kcal} kcal.` : `, confrontato con il tuo obiettivo di ${plan.obiettivo.kcal} kcal.`}
+                    </p>
+                    <div className="plan-tot">
+                      <Meter label="Calorie" value={plan.kcal_tot} unit="kcal" target={tg.kcal} />
+                      <Meter label="Proteine" value={plan.proteine_tot} target={tg.p} />
+                      <Meter label="Carboidrati" value={plan.carboidrati_tot} target={tg.c} />
+                      <Meter label="Grassi" value={plan.grassi_tot} target={tg.f || null} />
+                      <Meter label="Verdure" value={plan.verdure_tot} target={part ? null : 400} />
+                    </div>
+                  </>
+                );
+              })()
             ) : (
               <div className="plan-tot">
                 <Meter label="Proteine" value={plan.proteine_tot} />
