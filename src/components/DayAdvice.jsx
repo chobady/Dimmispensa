@@ -65,6 +65,8 @@ const LS_DIET = 'dm_diet';
 const LS_GUIDES = 'dm_guides';
 // dati della persona (peso, altezza...): solo su questo dispositivo
 const LS_PERSON = 'dm_person';
+// com'è la giornata di oggi (allenamento, movimento): chiesto prima del menu
+const LS_TODAY = 'dm_oggi';
 const WD = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
 const lsGet = (k, d) => {
   try {
@@ -132,7 +134,13 @@ export default function DayAdvice({ compact = false }) {
     setPerson(next);
     lsSet(LS_PERSON, next);
   };
-  const dietArg = guides.length || hasPerson ? { text: '', day: 0, guides: guides.map((g) => ({ name: g.name, text: g.text })), person } : null;
+  const [dayInfo, setDayInfo] = useState(() => {
+    const d = lsGet(LS_TODAY, null);
+    return d && d.date === todayISO() ? d : null;
+  });
+  const [asking, setAsking] = useState(false);
+  const [draft, setDraft] = useState(null);
+  const dietArg = { text: '', day: 0, guides: guides.map((g) => ({ name: g.name, text: g.text })), person: { ...person, oggi: dayInfo } };
   const hasRules = !!(diet || guides.length);
   const guideRef = useRef(null);
   const [shop, setShop] = useState(null); // { spesa, nota } della dieta
@@ -141,16 +149,33 @@ export default function DayAdvice({ compact = false }) {
   const [days, setDays] = useState(7);
   const today = todayISO();
   const plan = saved && saved.date === today ? saved.plan : null;
-  const sig = useMemo(() => sigOf(items) + '|' + (diet ? diet.importedAt + ':' + (diet.start || '') : '') + '|' + guides.map((g) => g.importedAt).join(',') + '|' + JSON.stringify(person), [items, diet, guides, person]);
+  const sigFor = (d) => baseSig + '|' + JSON.stringify(d);
+  const baseSig = useMemo(() => sigOf(items) + '|' + (diet ? diet.importedAt + ':' + (diet.start || '') : '') + '|' + guides.map((g) => g.importedAt).join(',') + '|' + JSON.stringify(person), [items, diet, guides, person]);
+  const sig = sigFor(dayInfo);
   const stale = plan && saved.sig !== sig;
 
-  const run = async () => {
+  // prima del menu chiede com'è la giornata (precompilato con l'ultima risposta o con i giorni di allenamento)
+  const ask = () => {
+    const wd = new Date().getDay();
+    const usual = (person.giorniAllenamento || []).includes(wd);
+    setDraft(dayInfo || { allena: usual, sport: person.sport || '', durata: 60, intensita: 'media', quando: '', movimento: 'normale' });
+    setAsking(true);
+  };
+  const confirmDay = () => {
+    const d = { ...draft, date: today };
+    lsSet(LS_TODAY, d);
+    setDayInfo(d);
+    setAsking(false);
+    run({ ...person, oggi: d });
+  };
+  const run = async (personNow) => {
     if (!key || busy) return;
+    if (!dayInfo && !personNow) return ask();
     setBusy(true);
     setErr('');
     try {
-      const p = await dayPlan(key, pantryText(items), dietArg);
-      const next = { date: today, sig, plan: p };
+      const p = await dayPlan(key, pantryText(items), personNow?.oggi ? { ...dietArg, person: personNow } : dietArg);
+      const next = { date: today, sig: sigFor(personNow?.oggi || dayInfo), plan: p };
       lsSet(LS_PLAN, next);
       setSaved(next);
     } catch (e) {
@@ -161,7 +186,7 @@ export default function DayAdvice({ compact = false }) {
   };
   // una volta al giorno lo preparo da solo (se c'è la chiave e la dispensa non è vuota)
   useEffect(() => {
-    if (key && !plan && !busy && !err && items.some((i) => !isCasa(i))) run();
+    if (key && !plan && !busy && !err && dayInfo && items.some((i) => !isCasa(i))) run();
   }, [key, today]);
 
   // cosa manca: per chiave del catalogo o per categoria
@@ -417,17 +442,93 @@ export default function DayAdvice({ compact = false }) {
               Aggiungi la chiave
             </a>
           </p>
+        ) : asking && draft ? (
+          <div className="day-ask stack">
+            <b className="small">Com'è la tua giornata oggi?</b>
+            <div className="field">
+              <span>Oggi ti alleni?</span>
+              <div className="seg-2">
+                <button type="button" className={'chip' + (draft.allena ? ' on' : '')} aria-pressed={draft.allena} onClick={() => setDraft({ ...draft, allena: true })}>
+                  Sì
+                </button>
+                <button type="button" className={'chip' + (!draft.allena ? ' on' : '')} aria-pressed={!draft.allena} onClick={() => setDraft({ ...draft, allena: false })}>
+                  No, riposo
+                </button>
+              </div>
+            </div>
+            {draft.allena && (
+              <div className="targets">
+                <label className="field span2">
+                  <span>Che allenamento</span>
+                  <input className="input" placeholder="es. pesi gambe, corsa, calcetto" value={draft.sport} onChange={(e) => setDraft({ ...draft, sport: e.target.value })} />
+                </label>
+                <label className="field">
+                  <span>Quanto dura</span>
+                  <select className="input pick" value={draft.durata} onChange={(e) => setDraft({ ...draft, durata: Number(e.target.value) })}>
+                    {[30, 45, 60, 75, 90, 120, 180].map((m) => (
+                      <option key={m} value={m}>
+                        {m} minuti
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Intensità</span>
+                  <select className="input pick" value={draft.intensita} onChange={(e) => setDraft({ ...draft, intensita: e.target.value })}>
+                    <option value="leggera">Leggera</option>
+                    <option value="media">Media</option>
+                    <option value="intensa">Intensa</option>
+                  </select>
+                </label>
+                <label className="field span2">
+                  <span>Quando</span>
+                  <select className="input pick" value={draft.quando} onChange={(e) => setDraft({ ...draft, quando: e.target.value })}>
+                    <option value="">Non so ancora</option>
+                    <option value="la mattina, prima di colazione">Mattina, a digiuno</option>
+                    <option value="la mattina">Mattina</option>
+                    <option value="all'ora di pranzo">Ora di pranzo</option>
+                    <option value="il pomeriggio">Pomeriggio</option>
+                    <option value="la sera, prima di cena">Sera</option>
+                  </select>
+                </label>
+              </div>
+            )}
+            <label className="field">
+              <span>Quanto ti muovi oggi (a parte l'allenamento)?</span>
+              <select className="input pick" value={draft.movimento} onChange={(e) => setDraft({ ...draft, movimento: e.target.value })}>
+                <option value="poco">Poco: quasi sempre seduto</option>
+                <option value="normale">Normale</option>
+                <option value="tanto">Tanto: in piedi o a piedi gran parte del giorno</option>
+              </select>
+            </label>
+            <div className="row">
+              <Btn sm color="yellow" className="grow" onClick={confirmDay}>
+                Fai il menu
+              </Btn>
+              <Btn sm onClick={() => setAsking(false)}>
+                Annulla
+              </Btn>
+            </div>
+          </div>
         ) : busy ? (
           <p className="small blink">Gemini sta pensando al menu di oggi...</p>
         ) : err ? (
           <div className="stack">
             <p className="small late-txt">{err}</p>
-            <Btn sm onClick={run}>
+            <Btn sm onClick={() => run()}>
               Riprova
             </Btn>
           </div>
         ) : plan ? (
           <>
+            {dayInfo && (
+              <p className="small muted">
+                Oggi: {dayInfo.allena ? `ti alleni${dayInfo.sport ? ' (' + dayInfo.sport + ', ' + dayInfo.durata + ' min)' : ` (${dayInfo.durata} min)`}` : 'riposo'}, movimento {dayInfo.movimento}.{' '}
+                <button type="button" className="link-btn small" onClick={ask}>
+                  Cambia
+                </button>
+              </p>
+            )}
             <ol className="meals-plan">
               {plan.pasti.map((m, i) => (
                 <li key={i}>
@@ -473,13 +574,13 @@ export default function DayAdvice({ compact = false }) {
             )}
             <div className="row plan-foot">
               <span className="small muted grow">{stale ? 'La dispensa o la dieta sono cambiate: aggiorna il menu.' : 'Preparato oggi con quello che hai.'}</span>
-              <Btn sm onClick={run}>
+              <Btn sm onClick={() => run()}>
                 {stale ? 'Aggiorna' : 'Un altro menu'}
               </Btn>
             </div>
           </>
         ) : (
-          <Btn sm onClick={run}>
+          <Btn sm onClick={ask}>
             Proponi il menu di oggi
           </Btn>
         )}

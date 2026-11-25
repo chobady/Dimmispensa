@@ -772,3 +772,5 @@ body.no-scroll { overflow: hidden; }
 .meals-plan .mp-add { grid-column: 2; justify-self: start; margin-top: 6px; font-size: 14px; padding: 3px 10px; }
 .plan-rules summary { cursor: pointer; text-decoration: underline; }
 .plan-rules ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.day-ask .seg-2 { display: flex; gap: 8px; margin-top: 4px; }
+.day-ask .seg-2 .chip { flex: 1; justify-content: center; font-size: 16px; padding: 8px; }

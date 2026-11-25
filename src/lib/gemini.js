@@ -406,7 +406,7 @@ const ACT = {
 const GOAL = { dimagrire: 'perdere grasso', mantenere: 'mantenere il peso', massa: 'aumentare la massa muscolare', salute: 'stare in salute' };
 // dati della persona (solo sul dispositivo): servono alle formule dei libri
 const personBlock = (p) => {
-  if (!p || !(p.peso || p.altezza || p.eta)) return '';
+  if (!p || !(p.peso || p.altezza || p.eta || p.oggi)) return '';
   const r = [];
   if (p.sesso) r.push(`sesso: ${p.sesso === 'f' ? 'donna' : 'uomo'}`);
   if (p.eta) r.push(`età: ${p.eta} anni`);
@@ -418,12 +418,22 @@ const personBlock = (p) => {
   if (p.allenamenti) r.push(`allenamenti a settimana: ${p.allenamenti}${p.sport ? ` (${p.sport})` : ''}`);
   if (p.obiettivo) r.push(`obiettivo: ${GOAL[p.obiettivo] || p.obiettivo}`);
   if (p.note) r.push(`note dell'utente: ${p.note}`);
-  const wd = new Date().getDay();
-  if (p.giorniAllenamento?.length) r.push(`oggi ${p.giorniAllenamento.includes(wd) ? 'si allena' : 'NON si allena'}`);
+  const o = p.oggi;
+  if (o) {
+    // risposte di oggi: contano più della routine abituale
+    const MOV = { poco: 'poco (quasi sempre seduto)', normale: 'normale', tanto: 'tanto (in piedi o a piedi gran parte del giorno)' };
+    r.push(
+      o.allena
+        ? `OGGI SI ALLENA: ${o.sport || 'allenamento'}${o.durata ? `, circa ${o.durata} minuti` : ''}${o.intensita ? `, intensità ${o.intensita}` : ''}${o.quando ? `, ${o.quando}` : ''}`
+        : 'OGGI NON SI ALLENA (giorno di riposo)'
+    );
+    if (o.movimento) r.push(`movimento di oggi oltre all'allenamento: ${MOV[o.movimento] || o.movimento}`);
+  }
   return `
 
 DATI DELL'UTENTE (usali con le formule e le tabelle dei libri, o con quelle standard se non ci sono libri, per calcolare calorie e grammi di oggi):
 ${r.map((x) => '- ' + x).join('\n')}
+Le informazioni su OGGI (allenamento sì o no, tipo, durata, intensità, momento, movimento) le ha date l'utente adesso: valgono più della routine abituale. Adatta calorie e carboidrati come dicono i libri per i giorni di allenamento o di riposo e, se si allena, metti più carboidrati nel pasto dopo l'allenamento.
 In "fabbisogno" scrivi in una riga come hai calcolato le calorie di oggi (formula usata e risultato); "kcal_tot" sono le calorie del menu.`;
 };
 const dietBlock = (diet) => {
