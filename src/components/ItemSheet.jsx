@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ICONS } from '../icons-data.js';
-import { CATALOG, CATEGORIES, LOCATIONS, MACROS, UNITS, isCasa, macroOf } from '../catalog.js';
+import { CATALOG, CATEGORIES, LOCATIONS, MACROS, UNITS, isCasa, macroOf, norm } from '../catalog.js';
 import { addDays, expiryLabel } from '../lib/dates.js';
 import { packKey, stepOf } from '../lib/items.js';
 import { Btn, Icon, Sheet, useApp } from './ui.jsx';
@@ -16,6 +16,27 @@ const UI_ONLY = new Set(['1f4c5', '1f4f7', '1f3a4', '2699', '1f5d1', '2b50', '1f
 const catalogIcons = [...new Set(CATALOG.map((f) => f.icon))];
 const ALL_ICONS = [...catalogIcons, ...Object.keys(ICONS).filter((k) => !catalogIcons.includes(k) && !UI_ONLY.has(k))];
 
+// Parole per cercare un'icona: nomi e parole chiave dei cibi del catalogo che la usano, più qualche nome per le altre
+const EXTRA_NAMES = {
+  '2615': 'caffè tè bevanda calda tazza', '2744': 'ghiaccio freddo surgelato neve', '2764': 'cuore', '1f32e': 'taco messicano', '1f32f': 'burrito piadina wrap',
+  '1f344': 'fungo funghi', '1f358': 'cracker di riso gallette', '1f35a': 'riso ciotola bianco', '1f35b': 'curry riso', '1f366': 'gelato cono soft',
+  '1f36d': 'lecca lecca caramella', '1f373': 'padella uovo fritto', '1f376': 'sakè sake vino di riso', '1f378': 'cocktail martini', '1f379': 'drink tropicale cocktail',
+  '1f37b': 'birre boccali', '1f37c': 'biberon latte neonato', '1f958': 'padella paella teglia', '1f95b': 'bicchiere di latte', '1f960': 'biscotto della fortuna',
+  '1f962': 'bacchette ciotola', '1f964': 'bibita cannuccia bicchiere', '1f968': 'pretzel brezel', '1f96f': 'bagel', '1f9c7': 'waffle cialda', '1f9c9': 'mate tisana',
+  '1f9ca': 'ghiaccio cubetti', '1f9cb': 'bubble tea', '1fad4': 'tamale', '1fad5': 'fonduta pentola', '1fad6': 'teiera tè tisana', '1fad7': 'versare liquido',
+  '1f404': 'mucca manzo', '1f986': 'anatra papera', '1f420': 'pesce tropicale', '1f382': 'torta di compleanno', '1f9fa': 'cesto cestino', '1f4e6': 'pacco scatola confezione',
+  '1f4a7': 'goccia acqua', '2600': 'sole', '2728': 'brillantini', vaschetta: 'vaschetta contenitore', caffe: 'caffè', rotolo: 'rotolo carta',
+};
+const ICON_WORDS = (() => {
+  const m = {};
+  const add = (k, t) => (m[k] = (m[k] ? m[k] + ' ' : '') + norm(t));
+  for (const f of CATALOG) add(f.icon, [f.name, f.key, f.cat, ...(f.kws || [])].join(' '));
+  for (const [k, t] of Object.entries(EXTRA_NAMES)) add(k, t);
+  for (const k of ALL_ICONS) if (/^[a-z]/.test(k)) add(k, k);
+  return m;
+})();
+const iconMatch = (k, words) => words.every((w) => (' ' + (ICON_WORDS[k] || '')).includes(' ' + w) || (ICON_WORDS[k] || '').includes(w));
+
 const QUICK_DATES = [
   ['+3 g', 3],
   ['+1 sett', 7],
@@ -28,6 +49,7 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
   const [d, setD] = useState({ ...item, macro: macroOf(item) });
   const casa = isCasa(d);
   const [picking, setPicking] = useState(false);
+  const [iq, setIq] = useState('');
   const { state, toast } = useApp();
   // altre confezioni uguali in dispensa
   const twins = isNew ? [] : state.items.filter((t) => t.id !== item.id && packKey(t) === packKey(item));
@@ -75,18 +97,29 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
   };
 
   if (picking) {
+    const words = norm(iq).split(' ').filter(Boolean);
+    // senza ricerca: prima le icone che corrispondono al nome del cibo
+    const sugg = !words.length ? ALL_ICONS.filter((k) => norm(d.name || '').split(' ').filter((w) => w.length > 2).some((w) => (ICON_WORDS[k] || '').includes(w))).slice(0, 12) : [];
+    const list = words.length ? ALL_ICONS.filter((k) => iconMatch(k, words)) : [...sugg, ...ALL_ICONS.filter((k) => !sugg.includes(k))];
+    const close = () => {
+      setPicking(false);
+      setIq('');
+    };
     return (
-      <Sheet title="Scegli l'icona" onClose={() => setPicking(false)}>
+      <Sheet title="Scegli l'icona" onClose={close}>
+        <input className="input icon-search" type="search" autoFocus placeholder="Cerca: mela, pesce, detersivo..." aria-label="Cerca un'icona" value={iq} onChange={(e) => setIq(e.target.value)} />
+        {!words.length && sugg.length > 0 && <p className="small muted">Suggerite per “{d.name}”, poi tutte le altre.</p>}
+        {words.length > 0 && !list.length && <p className="small muted center">Nessuna icona per “{iq}”. Prova con un'altra parola (anche in inglese).</p>}
         <div className="icon-grid">
-          {ALL_ICONS.map((k) => (
+          {list.map((k) => (
             <button
               key={k}
               type="button"
               className={k === d.icon ? 'on' : ''}
-              aria-label={'Icona ' + k}
+              aria-label={'Icona ' + ((ICON_WORDS[k] || k).split(' ')[0])}
               onClick={() => {
                 up({ icon: k });
-                setPicking(false);
+                close();
               }}
             >
               <Icon id={k} size={40} />

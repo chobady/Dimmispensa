@@ -726,3 +726,4 @@ body.no-scroll { overflow: hidden; }
 /* confezioni uguali */
 .card .packs { color: var(--ink); background: var(--yellow-t); padding: 0 5px; }
 .twins { background: var(--yellow-t); padding: 8px 10px; box-shadow: inset 4px 0 0 var(--yellow); }
+.icon-search { margin: 2px 2px 12px; position: sticky; top: 52px; z-index: 1; }
