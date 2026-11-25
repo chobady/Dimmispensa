@@ -722,3 +722,7 @@ body.no-scroll { overflow: hidden; }
 .import-opts { margin-top: 20px; }
 .import-opts summary { cursor: pointer; }
 .import-opts .opt-check { margin-top: 8px; }
+
+/* confezioni uguali */
+.card .packs { color: var(--ink); background: var(--yellow-t); padding: 0 5px; }
+.twins { background: var(--yellow-t); padding: 8px 10px; box-shadow: inset 4px 0 0 var(--yellow); }

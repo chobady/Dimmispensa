@@ -1,3 +1,4 @@
+import { packKey } from '../lib/items.js';
 import { useMemo, useState } from 'react';
 import { LOCATIONS, MACROS, isCasa, macroOf, norm } from '../catalog.js';
 import { daysLeft, expiryStatus } from '../lib/dates.js';
@@ -40,6 +41,17 @@ export default function Pantry() {
       .filter((i) => macro === 'tutti' || macroOf(i) === macro)
       .sort(byExpiry);
   }, [items, loc, q, macro]);
+
+  // confezioni uguali in una carta sola; si apre quella che scade prima (l'elenco è già in ordine di scadenza)
+  const groups = useMemo(() => {
+    const m = new Map();
+    for (const it of shown) {
+      const k = packKey(it);
+      if (m.has(k)) m.get(k).n++;
+      else m.set(k, { item: it, n: 1 });
+    }
+    return [...m.values()];
+  }, [shown]);
 
   const expired = items.filter((i) => expiryStatus(i.expiry, warnDays) === 'expired').length;
   const soon = items.filter((i) => ['today', 'soon'].includes(expiryStatus(i.expiry, warnDays))).length;
@@ -97,8 +109,8 @@ export default function Pantry() {
       </div>
 
       <div className="list">
-        {shown.map((it) => (
-          <ItemCard key={it.id} item={it} onOpen={openItem} gone={goneIds.has(it.id)} />
+        {groups.map(({ item: it, n }) => (
+          <ItemCard key={it.id} item={it} count={n} onOpen={openItem} gone={goneIds.has(it.id)} />
         ))}
       </div>
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ICONS } from '../icons-data.js';
 import { CATALOG, CATEGORIES, LOCATIONS, MACROS, UNITS, isCasa, macroOf } from '../catalog.js';
 import { addDays, expiryLabel } from '../lib/dates.js';
-import { stepOf } from '../lib/items.js';
+import { packKey, stepOf } from '../lib/items.js';
 import { Btn, Icon, Sheet, useApp } from './ui.jsx';
 import MacroPanel from './MacroPie.jsx';
 import Pairings from './Pairings.jsx';
@@ -29,6 +29,8 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
   const casa = isCasa(d);
   const [picking, setPicking] = useState(false);
   const { state, toast } = useApp();
+  // altre confezioni uguali in dispensa
+  const twins = isNew ? [] : state.items.filter((t) => t.id !== item.id && packKey(t) === packKey(item));
   const [finding, setFinding] = useState(false);
   const findValues = async () => {
     setFinding(true);
@@ -114,6 +116,11 @@ export default function ItemSheet({ item, isNew, onSave, onDelete, onEaten, onSh
             <p className="small">Sta per scadere: se lo congeli dura altri 2 mesi.</p>
             <Btn color="blue" block icon="2744" sound={null} onClick={onFreeze}>Congela</Btn>
           </div>
+        )}
+        {!isNew && twins.length > 0 && (
+          <p className="small twins">
+            {twins.length === 1 ? "Hai un'altra confezione uguale" : `Hai altre ${twins.length} confezioni uguali`} ({twins.map((t) => expiryLabel(t.expiry, t.est)).join(', ')}). Finito e Buttato valgono solo per questa.
+          </p>
         )}
         {!isNew && (
           <div className="two">

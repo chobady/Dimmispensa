@@ -69,6 +69,14 @@ export const qtyLabel = (item) => {
   return item.unit === 'pz' ? `×${n}` : `${n} ${item.unit}`;
 };
 
+// Confezioni uguali (stesso nome, marca, posto e formato): in dispensa si mostrano come una sola carta "2 × 380 g"
+export const packKey = (it) => [String(it.name || '').trim().toLowerCase(), String(it.brand || '').trim().toLowerCase(), it.loc, it.unit, Number(it.qty) || 0, it.food || ''].join('|');
+export const packLabel = (item, n) => {
+  if (n < 2) return qtyLabel(item);
+  if (item.unit === 'pz') return qtyLabel({ ...item, qty: (Number(item.qty) || 0) * n });
+  return `${n} × ${qtyLabel(item)}`;
+};
+
 // Di quanto scende la quantità con il tasto "−"
 export const stepOf = (unit) => (unit === 'g' || unit === 'ml' ? 50 : unit === 'kg' || unit === 'l' ? 0.5 : 1);
 

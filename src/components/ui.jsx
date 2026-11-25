@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ICONS, MASCOT } from '../icons-data.js';
 import { expiryLabel, expiryStatus, lifeRatio } from '../lib/dates.js';
-import { qtyLabel } from '../lib/items.js';
+import { packLabel, qtyLabel } from '../lib/items.js';
 import { BY_KEY, MACROS, macroOf } from '../catalog.js';
 import { play } from '../lib/sound.js';
 
@@ -89,7 +89,7 @@ export function HpBar({ item }) {
   );
 }
 
-export function ItemCard({ item, onOpen, gone }) {
+export function ItemCard({ item, onOpen, gone, count = 1 }) {
   const { warnDays } = useApp();
   const st = expiryStatus(item.expiry, warnDays);
   return (
@@ -100,7 +100,7 @@ export function ItemCard({ item, onOpen, gone }) {
         <div className="sub">
           <span className={'loc ' + item.loc}>{{ frigo: 'FRIGO', freezer: 'FREEZER', spezie: 'SPEZIE', casa: 'CASA' }[item.loc] || 'DISP.'}</span>
           <MacroBadge item={item} />
-          {qtyLabel(item)}
+          {count > 1 ? <span className="packs">{packLabel(item, count)}</span> : qtyLabel(item)}
           {item.brand ? ' · ' + item.brand : ''}
         </div>
       </div>
