@@ -67,6 +67,7 @@ const LS_GUIDES = 'dm_guides';
 const LS_PERSON = 'dm_person';
 // com'è la giornata di oggi (allenamento, movimento): chiesto prima del menu
 const LS_TODAY = 'dm_oggi';
+const MEALS = ['Colazione', 'Spuntino', 'Pranzo', 'Cena'];
 const WD = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
 const lsGet = (k, d) => {
   try {
@@ -106,7 +107,7 @@ const sigOf = (items) =>
     .sort()
     .join(',');
 
-export default function DayAdvice({ compact = false }) {
+export default function DayAdvice({ compact = false, page = false }) {
   const { state, go, toast } = useApp();
   const items = state.items;
   const key = state.pantry?.geminiKey || '';
@@ -155,27 +156,44 @@ export default function DayAdvice({ compact = false }) {
   const stale = plan && saved.sig !== sig;
 
   // prima del menu chiede com'è la giornata (precompilato con l'ultima risposta o con i giorni di allenamento)
-  const ask = () => {
+  const ask = (meals = MEALS) => {
     const wd = new Date().getDay();
     const usual = (person.giorniAllenamento || []).includes(wd);
-    setDraft(dayInfo || { allena: usual, sport: person.sport || '', durata: 60, intensita: 'media', quando: '', movimento: 'normale' });
+    setDraft({ ...(dayInfo || { allena: usual, sport: person.sport || '', durata: 60, intensita: 'media', quando: '', movimento: 'normale' }), meals });
     setAsking(true);
   };
   const confirmDay = () => {
-    const d = { ...draft, date: today };
+    const { meals, ...rest } = draft;
+    const d = { ...rest, date: today };
     lsSet(LS_TODAY, d);
     setDayInfo(d);
     setAsking(false);
-    run({ ...person, oggi: d });
+    run({ ...person, oggi: d }, meals.length === MEALS.length ? null : meals);
   };
-  const run = async (personNow) => {
+  // only: pasti da rifare (es. ['Cena']); gli altri restano quelli del menu già fatto
+  const run = async (personNow, only = null) => {
     if (!key || busy) return;
-    if (!dayInfo && !personNow) return ask();
+    if (!dayInfo && !personNow) return ask(only || MEALS);
     setBusy(true);
     setErr('');
     try {
-      const p = await dayPlan(key, pantryText(items), personNow?.oggi ? { ...dietArg, person: personNow } : dietArg);
-      const next = { date: today, sig: sigFor(personNow?.oggi || dayInfo), plan: p };
+      const group = (n) => (n === 'Merenda' ? 'Spuntino' : n);
+      const keep = only && plan ? plan.pasti.filter((m) => !only.includes(group(m.pasto))) : [];
+      const others = keep.map((m) => `${m.pasto}: ${m.piatto} (circa ${Math.round(m.kcal || 0)} kcal, ${Math.round(m.proteine_g || 0)} g di proteine, ${Math.round(m.verdure_g || 0)} g di verdure)`);
+      // anche quello che è già nei Pasti di oggi
+      Object.entries(state.meals?.[today] || {}).forEach(([slot, list]) => {
+        const nm = { colazione: 'Colazione', snack: 'Spuntino', pranzo: 'Pranzo', cena: 'Cena' }[slot];
+        if (only && !only.includes(nm) && list?.length && !keep.some((m) => group(m.pasto) === nm)) others.push(`${nm} (già nei Pasti): ${list.map((e) => e.name).join(', ')}`);
+      });
+      const p = await dayPlan(key, pantryText(items), personNow?.oggi ? { ...dietArg, person: personNow } : dietArg, { only, others });
+      let merged = p;
+      if (only && keep.length) {
+        const ORDER = ['Colazione', 'Spuntino', 'Pranzo', 'Merenda', 'Cena'];
+        const pasti = [...keep, ...p.pasti].sort((a, b) => ORDER.indexOf(a.pasto) - ORDER.indexOf(b.pasto));
+        const sum = (k) => pasti.reduce((t, m) => t + (Number(m[k]) || 0), 0);
+        merged = { ...p, pasti, proteine_tot: sum('proteine_g'), verdure_tot: sum('verdure_g'), kcal_tot: sum('kcal') || p.kcal_tot, da_comprare: [...new Set([...(plan.da_comprare || []), ...(p.da_comprare || [])])] };
+      }
+      const next = { date: today, sig: sigFor(personNow?.oggi || dayInfo), plan: merged };
       lsSet(LS_PLAN, next);
       setSaved(next);
     } catch (e) {
@@ -320,7 +338,7 @@ export default function DayAdvice({ compact = false }) {
   };
 
   return (
-    <aside className={'day-advice' + (compact ? ' compact' : '')}>
+    <aside className={'day-advice' + (compact ? ' compact' : '') + (page ? ' page' : '')}>
       <Box compact={compact} icon="1f37d" title="Oggi da mangiare" hint={plan ? `${plan.pasti.length} pasti` : ''}>
         <div className="advice-tools">
           <button type="button" className="link-btn small" onClick={() => setEdit(!edit)}>
@@ -444,6 +462,32 @@ export default function DayAdvice({ compact = false }) {
           </p>
         ) : asking && draft ? (
           <div className="day-ask stack">
+            <div className="field">
+              <span>Cosa ti preparo?</span>
+              <div className="chips">
+                <button type="button" className={'chip' + (draft.meals.length === MEALS.length ? ' on' : '')} onClick={() => setDraft({ ...draft, meals: MEALS })}>
+                  Tutta la giornata
+                </button>
+                {MEALS.map((m) => {
+                  const on = draft.meals.length < MEALS.length && draft.meals.includes(m);
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      className={'chip' + (on ? ' on' : '')}
+                      aria-pressed={on}
+                      onClick={() => {
+                        const cur = draft.meals.length === MEALS.length ? [] : draft.meals;
+                        const next = on ? cur.filter((x) => x !== m) : [...cur, m];
+                        setDraft({ ...draft, meals: next.length ? MEALS.filter((x) => next.includes(x)) : MEALS });
+                      }}
+                    >
+                      Solo {m.toLowerCase()}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <b className="small">Com'è la tua giornata oggi?</b>
             <div className="field">
               <span>Oggi ti alleni?</span>
@@ -503,7 +547,7 @@ export default function DayAdvice({ compact = false }) {
             </label>
             <div className="row">
               <Btn sm color="yellow" className="grow" onClick={confirmDay}>
-                Fai il menu
+                {draft.meals.length === MEALS.length ? 'Fai il menu del giorno' : `Prepara: ${draft.meals.join(', ').toLowerCase()}`}
               </Btn>
               <Btn sm onClick={() => setAsking(false)}>
                 Annulla
@@ -524,7 +568,7 @@ export default function DayAdvice({ compact = false }) {
             {dayInfo && (
               <p className="small muted">
                 Oggi: {dayInfo.allena ? `ti alleni${dayInfo.sport ? ' (' + dayInfo.sport + ', ' + dayInfo.durata + ' min)' : ` (${dayInfo.durata} min)`}` : 'riposo'}, movimento {dayInfo.movimento}.{' '}
-                <button type="button" className="link-btn small" onClick={ask}>
+                <button type="button" className="link-btn small" onClick={() => ask()}>
                   Cambia
                 </button>
               </p>
@@ -535,9 +579,15 @@ export default function DayAdvice({ compact = false }) {
                   <span className="mp-when">{m.pasto}</span>
                   <span className="mp-dish">{m.piatto}</span>
                   <span className="mp-ingr">{m.ingredienti.join(' · ')}</span>
-                  <button type="button" className={'chip mp-add' + (inMeals(m) ? ' on' : '')} disabled={inMeals(m)} onClick={() => toMeals([m])}>
-                    {inMeals(m) ? 'In Pasti' : '+ Pasti'}
-                  </button>
+                  <span className="mp-acts">
+                    <button type="button" className={'chip' + (inMeals(m) ? ' on' : '')} disabled={inMeals(m)} onClick={() => toMeals([m])}>
+                      {inMeals(m) ? 'In Pasti' : '+ Pasti'}
+                    </button>
+                    <button type="button" className="chip" onClick={() => run(null, [m.pasto === 'Merenda' ? 'Spuntino' : m.pasto])}>
+                      Rifai {m.pasto.toLowerCase()}
+                    </button>
+                    {m.kcal ? <span className="small muted">{Math.round(m.kcal)} kcal</span> : null}
+                  </span>
                 </li>
               ))}
             </ol>
@@ -574,14 +624,14 @@ export default function DayAdvice({ compact = false }) {
             )}
             <div className="row plan-foot">
               <span className="small muted grow">{stale ? 'La dispensa o la dieta sono cambiate: aggiorna il menu.' : 'Preparato oggi con quello che hai.'}</span>
-              <Btn sm onClick={() => run()}>
-                {stale ? 'Aggiorna' : 'Un altro menu'}
+              <Btn sm onClick={() => (stale ? run() : ask())}>
+                {stale ? 'Aggiorna' : 'Nuovo menu'}
               </Btn>
             </div>
           </>
         ) : (
-          <Btn sm onClick={ask}>
-            Proponi il menu di oggi
+          <Btn sm color="yellow" onClick={() => ask()}>
+            Prepara il menu di oggi
           </Btn>
         )}
       </Box>

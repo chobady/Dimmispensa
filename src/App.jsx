@@ -8,6 +8,7 @@ import Pantry from './screens/Pantry.jsx';
 import Expiry from './screens/Expiry.jsx';
 import Add from './screens/Add.jsx';
 import Meals from './screens/Meals.jsx';
+import MenuDay from './screens/MenuDay.jsx';
 import Settings from './screens/Settings.jsx';
 import Shopping, { shopItemFrom } from './screens/Shopping.jsx';
 import { Login, PantryChoice } from './screens/Auth.jsx';
@@ -17,6 +18,7 @@ const TABS = [
   { id: 'scadenze', name: 'Scadenze', icon: '23f0' },
   { id: 'aggiungi', name: 'Aggiungi' },
   { id: 'pasti', name: 'Pasti', icon: '1f4c5' },
+  { id: 'menu', name: 'Menu', icon: '1f37d' },
   { id: 'spesa', name: 'Spesa', icon: '1f6d2' },
   { id: 'opzioni', name: 'Opzioni', icon: '2699', deskOnly: true },
 ];
@@ -134,7 +136,7 @@ export default function App() {
   const alerts = state.items.filter((i) => ['expired', 'today', 'soon'].includes(expiryStatus(i.expiry, warnDays))).length;
   const openItem = openId ? state.items.find((i) => i.id === openId) : null;
   const toBuy = Object.values(state.shopping || {}).filter((s) => !s.done).length;
-  const Screen = { dispensa: Pantry, scadenze: Expiry, aggiungi: Add, pasti: Meals, spesa: Shopping, opzioni: Settings }[tab];
+  const Screen = { dispensa: Pantry, scadenze: Expiry, aggiungi: Add, pasti: Meals, menu: MenuDay, spesa: Shopping, opzioni: Settings }[tab];
 
   return (
     <AppCtx.Provider value={ctx}>

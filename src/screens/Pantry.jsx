@@ -1,6 +1,5 @@
 import { packKey } from '../lib/items.js';
-import { useEffect, useMemo, useState } from 'react';
-import DayAdvice from '../components/DayAdvice.jsx';
+import { useMemo, useState } from 'react';
 import { LOCATIONS, MACROS, isCasa, macroOf, norm } from '../catalog.js';
 import { daysLeft, expiryStatus } from '../lib/dates.js';
 import { play } from '../lib/sound.js';
@@ -17,20 +16,7 @@ export const byExpiry = (a, b) => {
 
 // posti piccoli, sotto le schede principali
 
-const WIDE = '(min-width: 900px)';
-function useWide() {
-  const [w, setW] = useState(() => typeof matchMedia !== 'undefined' && matchMedia(WIDE).matches);
-  useEffect(() => {
-    const m = matchMedia(WIDE);
-    const on = () => setW(m.matches);
-    m.addEventListener?.('change', on);
-    return () => m.removeEventListener?.('change', on);
-  }, []);
-  return w;
-}
-
 export default function Pantry() {
-  const wide = useWide();
   const { state, warnDays, openItem, go, goneIds } = useApp();
   const [loc, setLoc] = useState('tutto');
   const [q, setQ] = useState('');
@@ -135,8 +121,6 @@ export default function Pantry() {
             )}
           </div>
 
-          {!wide && items.length > 0 && <DayAdvice compact />}
-
           <div className="list">
             {groups.map(({ item: it, n }) => (
               <ItemCard key={it.id} item={it} count={n} onOpen={openItem} gone={goneIds.has(it.id)} />
@@ -159,7 +143,6 @@ export default function Pantry() {
             </div>
           )}
         </div>
-        {wide && <DayAdvice />}
       </div>
     </>
   );

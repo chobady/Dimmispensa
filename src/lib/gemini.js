@@ -380,6 +380,7 @@ const DAY_SCHEMA = {
           ingredienti: { type: 'ARRAY', items: { type: 'STRING' } },
           proteine_g: { type: 'NUMBER' },
           verdure_g: { type: 'NUMBER' },
+          kcal: { type: 'NUMBER' },
         },
         required: ['pasto', 'piatto', 'ingredienti', 'proteine_g', 'verdure_g'],
       },
@@ -457,9 +458,18 @@ ${String(g.text).slice(0, 70000)}
   });
   return out;
 };
-export async function dayPlan(key, pantry, diet = null) {
+// opts.only: pasti da proporre (es. ['Cena']); opts.others: righe sugli altri pasti di oggi già decisi
+export async function dayPlan(key, pantry, diet = null, opts = {}) {
   const books = diet && (diet.text || diet.guides?.length);
-  const prompt = `Sei un nutrizionista pratico. Proponi cosa mangiare OGGI usando soprattutto quello che c'è in casa.
+  const only = opts.only?.length ? opts.only : null;
+  const prompt = `Sei un nutrizionista pratico. ${only ? `Proponi SOLO questi pasti di OGGI: ${only.join(', ')} (nessun altro pasto)` : 'Proponi cosa mangiare OGGI per tutta la giornata'}, usando soprattutto quello che c'è in casa.${
+    only
+      ? `
+Dosa questi pasti per la loro quota del fabbisogno di oggi (indicativamente colazione 20%, spuntino 10%, pranzo 30-35%, cena 30-35%), tenendo conto di quanto previsto negli altri pasti${opts.others?.length ? `:
+${opts.others.map((x) => '- ' + x).join('\n')}` : '.'}
+"proteine_tot", "verdure_tot" e "kcal_tot" sono la somma dei soli pasti proposti; in "fabbisogno" indica il fabbisogno della giornata e la quota assegnata a questi pasti.`
+      : ''
+  }
 ${
   books
     ? `Segui TUTTI i libri dell'utente qui sotto, insieme: da lì prendi calorie, quantità di proteine, carboidrati, grassi, verdure e frutta, porzioni, cibi da preferire e da limitare, condimenti e cotture. Non inventare obiettivi diversi da quelli dei libri.
@@ -468,7 +478,8 @@ Prima di rispondere ricontrolla ogni ingrediente con i libri: se un libro lo sco
 }
 Regole:
 - Usa prima i cibi che scadono presto. Porzioni realistiche per una persona, in grammi.
-- 3 pasti principali più gli spuntini che servono.
+- ${only ? 'Solo i pasti richiesti.' : '3 pasti principali più gli spuntini che servono.'}
+- Per ogni pasto "kcal": calorie stimate di quel pasto.
 - "ingredienti": righe brevi con quantità, es. "Petto di pollo 150 g". Indica con "(da comprare)" quello che non c'è in casa.
 - "proteine_g" e "verdure_g": stime per quel pasto (grammi di proteine come nutriente, grammi di verdura come peso); "proteine_tot" e "verdure_tot": somme della giornata.
 - "kcal_tot": calorie stimate di tutto il menu.
