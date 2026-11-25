@@ -616,7 +616,7 @@ export default function DayAdvice({ compact = false, page = false }) {
                       <Meter label="Proteine" value={plan.proteine_tot} target={tg.p} />
                       <Meter label="Carboidrati" value={plan.carboidrati_tot} target={tg.c} />
                       <Meter label="Grassi" value={plan.grassi_tot} target={tg.f || null} />
-                      <Meter label="Verdure" value={plan.verdure_tot} target={part ? null : 400} />
+                      {!part || part.some((x) => x.pasto === 'Pranzo' || x.pasto === 'Cena') ? <Meter label="Verdure" value={plan.verdure_tot} target={part ? null : 400} /> : null}
                     </div>
                   </>
                 );

@@ -71,7 +71,7 @@ export const FOODS = [
   F('cracker', 'Cracker integrali', 'cereale', 'spuntino', [400, 10.5, 67, 9.5, 8], [25, 50, 5], { keys: ['cracker', 'gallette'], words: ['cracker', 'gallette'] }),
   F('latte', 'Latte parzialmente scremato', 'latte', 'colazione', [46, 3.5, 5, 1.6], [150, 300, 25], { keys: ['latte'], words: ['latte'] }, { buy: 'Latte parzialmente scremato', ml: true }),
   F('yogurt', 'Yogurt bianco', 'latte', 'colazione', [50, 3.8, 4.3, 1.7], [125, 250, 125], { keys: ['yogurt'], words: ['yogurt bianco', 'yogurt naturale', 'yogurt magro', 'yogurt'] }, { piece: 125, buy: 'Yogurt bianco senza zucchero' }),
-  F('greco', 'Yogurt greco magro', 'latte', 'colazione', [57, 10, 4, 0.2], [150, 300, 25], { words: ['yogurt greco', 'greek', 'skyr', 'kefir'] }, { buy: 'Yogurt greco 0% bianco' }),
+  F('greco', 'Yogurt greco magro', 'latte', 'colazione', [57, 10, 4, 0.2], [100, 300, 25], { words: ['yogurt greco', 'greek', 'skyr', 'kefir'] }, { buy: 'Yogurt greco 0% bianco' }),
   // frutta secca (MN 20-30 g; PN quantità ragionevoli)
   F('noci', 'Noci', 'nuts', 'frutta secca', [689, 14.3, 5.1, 68.1, 6.2], [10, 30, 5], { keys: ['noci'], words: ['noci'] }, { buy: 'Noci' }),
   F('mandorle', 'Mandorle', 'nuts', 'frutta secca', [603, 22, 4.6, 55.3, 12.7], [10, 30, 5], { keys: ['mandorle'], words: ['mandorle', 'nocciole', 'pistacchi', 'anacardi'] }, { buy: 'Mandorle' }),
@@ -278,7 +278,7 @@ export function dailyTargets(person = {}) {
   const fatMin = Math.round((kcal * 0.25) / 9);
   const fat = Math.max(fatMin, Math.min(fatMax, Math.round(0.8 * w)));
   const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4));
-  const ck = carbs / w;
+  const ck = carbs / wCalc;
   if (ck < 2) notes.push(`Carboidrati sotto 2 g/kg, il minimo del ${MN}: aumenta le calorie o parla con un professionista.`);
   if (trains && ck < 4) notes.push(`Oggi ti alleni: ${PN} consiglia almeno 4 g/kg di carboidrati come base (qui ${ck.toFixed(1)} g/kg); il menu mette più carboidrati nel pasto dopo l'allenamento.`);
   return {
@@ -290,6 +290,9 @@ export function dailyTargets(person = {}) {
     fruit: 2,
     fiber: 25,
     w,
+    wCalc,
+    sporty,
+    pMax: Math.round((sporty ? 2 : 1.8) * wCalc),
     bmi,
     trains,
     goal,
@@ -476,7 +479,8 @@ function sizeMain(t, prot, carb, vegs, have, used, opts) {
   for (let k = 0; k < 3; k++) {
     if (prot) {
       pG = ((t.p - vegT.p - (cG / 100) * cv.p) / pv.p) * 100;
-      pG = Math.min(prot.max, Math.max(prot.min, pG));
+      const pMin = prot.piece ? prot.min : round(prot.min * 0.7, 10);
+      pG = Math.min(prot.max, Math.max(pMin, pG));
       pG = prot.piece ? Math.max(prot.min, Math.round(pG / prot.piece) * prot.piece) : round(pG, prot.step || 10);
     }
     const pK = prot ? (pG / 100) * pv.kcal : 0;
@@ -498,11 +502,11 @@ function sizeMain(t, prot, carb, vegs, have, used, opts) {
   lines.push(line(carb, cG, have, used));
   lines.push(...vegs.map((v) => line(v, round(vegG / vegs.length, 50), have, used)));
   lines.push(line(oil, oilG, have, used));
-  // se mancano ancora calorie, pane integrale (MN negli schemi) fino a 100 g
+  // se mancano ancora calorie, pane integrale (MN negli schemi) fino a 150 g
   const s = sum(lines);
   if (t.kcal - s.kcal > 120 && carb.tag !== 'pane') {
     const bread = BYID.paneint;
-    const g = Math.min(100, round(((t.kcal - s.kcal) / bread.kcal) * 100, 10));
+    const g = Math.min(150, round(((t.kcal - s.kcal) / bread.kcal) * 100, 10));
     if (g >= 30) lines.push(line(bread, g, have, used));
   }
   return lines;
@@ -520,7 +524,7 @@ function dishName(meal, lines) {
     const has = (id) => lines.some((l) => l.id === id);
     const fr = by('fruit').map((l) => l.name.toLowerCase());
     const nu = by('nuts').map((l) => l.name.toLowerCase());
-    const extra = [...fr, ...nu].join(' e ');
+    const extra = [...(has('avena') && has('fette') ? ['fette biscottate integrali'] : []), ...fr, ...nu].join(', ').replace(/, ([^,]*)$/, ' e $1');
     if (has('avena') && has('latte')) return `Porridge d'avena con latte${extra ? ', ' + extra : ''}`;
     if (has('avena')) return `${has('greco') ? 'Yogurt greco' : 'Yogurt'} con avena${extra ? ', ' + extra : ''}`;
   }
@@ -535,6 +539,8 @@ function dishName(meal, lines) {
   return `${p}${c ? ` con ${c}` : ''}${vegs.length ? ` e ${vegs.join(' e ')}` : ''}`;
 }
 
+// MN: frutta secca 20-30 g al giorno in tutto (colazione + spuntino)
+const NUTS_DAY = 30;
 function breakfast(t, have, used, month, seed, opts) {
   const lines = [];
   const dairy = pick(FOODS.filter((f) => f.role === 'latte'), have, seed, (f) => (f.id === 'greco' ? 1.5 : f.id === 'latte' ? 0.5 : 0) + (opts.lactose && f.id === 'latte' ? -1 : 0));
@@ -546,26 +552,42 @@ function breakfast(t, have, used, month, seed, opts) {
   let s = sum(lines);
   const nuts = pick(FOODS.filter((f) => f.role === 'nuts'), have, seed);
   const cv = n100(cer, have);
-  let cG = round(Math.min(cer.max, Math.max(cer.min, ((t.kcal - s.kcal - 15 * 6.5) / cv.kcal) * 100)), cer.step);
+  const cG = round(Math.min(cer.max, Math.max(cer.min, ((t.kcal - s.kcal - 15 * 6.5) / cv.kcal) * 100)), cer.step);
   lines.splice(1, 0, line(cer, cG, have, used));
   s = sum(lines);
-  const nG = Math.min(nuts.max, Math.max(0, round(((t.kcal - s.kcal) / nuts.kcal) * 100, 5)));
-  if (nG >= 10) lines.push(line(nuts, nG, have, used));
+  // frutta secca al massimo 20 g a colazione, così ne resta per lo spuntino
+  const nG = Math.min(20, Math.max(0, round(((t.kcal - s.kcal) / nuts.kcal) * 100, 5)));
+  if (nG >= 5) lines.push(line(nuts, Math.max(10, nG), have, used));
+  // se mancano ancora calorie: fette biscottate integrali (MN, colazione)
+  s = sum(lines);
+  if (t.kcal - s.kcal > 70 && cer.id !== 'fette') {
+    const fe = BYID.fette;
+    lines.splice(2, 0, line(fe, Math.min(fe.max, Math.max(fe.min, round(((t.kcal - s.kcal) / fe.kcal) * 100, 5))), have, used));
+  }
   return lines;
 }
 function snack(t, have, used, month, seed, opts) {
   const fr = chooseFruit(have, month, seed + 1, opts.avoidFruit);
   const lines = [line(fr, 150, have, used)];
-  const s = sum(lines);
-  const rest = t.kcal - s.kcal;
-  if (rest > 100) {
-    const opt = pick(FOODS.filter((f) => ['nuts', 'latte'].includes(f.role) && f.id !== 'latte'), have, seed, (f) => (f.id === 'greco' ? 1 : 0));
-    const g = opt.piece ? opt.piece : round(Math.min(opt.role === 'latte' ? 170 : opt.max, Math.max(opt.min, (rest / n100(opt, have).kcal) * 100)), opt.step);
+  const nutsLeft = NUTS_DAY - (opts.nutsG || 0);
+  const rest = t.kcal - sum(lines).kcal;
+  if (rest > 35) {
+    // MN: frutta secca come spuntino (20-30 g al giorno in tutto); yogurt greco se servono proteine; cracker integrali
+    const needP = opts.pk >= 1.4 && t.p >= 10;
+    const cand = FOODS.filter((f) => (f.role === 'nuts' && nutsLeft >= 10) || (f.role === 'latte' && f.id !== 'latte' && !(f.id === 'greco' && !needP && opts.dairy?.includes('greco'))) || f.id === 'cracker');
+    const opt = pick(cand, have, seed, (f) => (f.role === 'nuts' ? (nutsLeft * 6 >= rest * 0.7 ? 0.5 : -0.8) : 0) + (f.id === 'greco' ? (needP ? 1 : -1) : 0) + (f.id === 'cracker' ? (nutsLeft >= 20 ? -1 : 0.3) : 0));
+    const max = opt.role === 'nuts' ? Math.min(opt.max, nutsLeft) : opt.role === 'latte' ? 170 : opt.max;
+    const g = opt.piece ? opt.piece : round(Math.min(max, Math.max(opt.min, (rest / n100(opt, have).kcal) * 100)), opt.step);
     lines.push(line(opt, g, have, used));
     const rest2 = t.kcal - sum(lines).kcal;
-    if (rest2 > 80 && opt.role !== 'nuts') {
+    if (rest2 > 40 && opt.role !== 'nuts' && nutsLeft >= 10) {
       const nuts = pick(FOODS.filter((f) => f.role === 'nuts'), have, seed);
-      lines.push(line(nuts, Math.min(30, Math.max(10, round((rest2 / nuts.kcal) * 100, 5))), have, used));
+      lines.push(line(nuts, Math.min(nutsLeft, Math.max(10, round((rest2 / nuts.kcal) * 100, 5))), have, used));
+    }
+    const rest3 = t.kcal - sum(lines).kcal;
+    if (rest3 > 80 && !lines.some((l) => l.id === 'cracker')) {
+      const cr = BYID.cracker;
+      lines.push(line(cr, Math.min(cr.max, Math.max(cr.min, round((rest3 / cr.kcal) * 100, 5))), have, used));
     }
   }
   return lines;
@@ -612,12 +634,20 @@ export function planDay({ items, person = {}, only = null, seed = {}, keep = nul
     const s = seed[meal] || 0;
     const t = { kcal: T.kcal * share[meal], p: T.protein * share[meal], c: T.carbs * share[meal], f: T.fat * share[meal], share: share[meal] };
     let lines;
+    // proteine date in più (o in meno) dai pasti precedenti: si compensano nei principali rimasti
+    let tSize = t;
+    if (meal === 'Pranzo' || meal === 'Cena') {
+      const done = [...kept, ...pasti].filter((m) => MEALS.indexOf(m.pasto) < MEALS.indexOf(meal));
+      const extra = done.reduce((x, m) => x + (m.p - T.protein * share[m.pasto]), 0);
+      const left = meals.filter((m) => (m === 'Pranzo' || m === 'Cena') && MEALS.indexOf(m) >= MEALS.indexOf(meal)).length || 1;
+      tSize = { ...t, p: Math.min(t.p * 1.5, Math.max(t.p * 0.6, t.p - extra / left)) };
+    }
     const why = [];
     if (meal === 'Colazione') {
       lines = breakfast(t, have, used, month, s, { ...opts, avoidFruit: usedFruit });
       why.push(`Colazione circa ${Math.round(share[meal] * 100)}% delle calorie (${MN}); frutta anche a colazione (${MN}); latte o yogurt bianco senza zuccheri aggiunti (${PN}).`);
     } else if (meal === 'Spuntino') {
-      lines = snack(t, have, used, month, s, { avoidFruit: usedFruit });
+      lines = snack(t, have, used, month, s, { pk: T.protein / T.wCalc, avoidFruit: usedFruit, dairy: [...kept, ...pasti].flatMap((m) => m.lines.filter((l) => l.role === 'latte').map((l) => l.id)), nutsG: [...kept, ...pasti].flatMap((m) => m.lines).filter((l) => l.role === 'nuts').reduce((g, l) => g + l.g, 0) });
       why.push(`Spuntino con frutta (${MN}: un frutto è un ottimo spuntino); frutta secca 20-30 g (${MN}).`);
     } else {
       const avoidTags = [...usedProt]; // varietà: fonti proteiche diverse a pranzo e a cena
@@ -628,7 +658,7 @@ export function planDay({ items, person = {}, only = null, seed = {}, keep = nul
       const v1 = chooseVeg(have, month, s, usedVeg);
       const v2 = chooseVeg(have, month, s + 1, [...usedVeg, v1?.id]);
       const vegs = [v1, v2].filter(Boolean);
-      lines = sizeMain(t, prot, carb, vegs, have, used, { vegG: 250, oilMax: 20 });
+      lines = sizeMain(tSize, prot, carb, vegs, have, used, { vegG: 250, oilMax: 20 });
       usedProt.push(prot.tag);
       usedVeg.push(...vegs.map((v) => v.id));
       if (meal === post) why.push(`Dopo l'allenamento più carboidrati (${PN}).`);
@@ -664,7 +694,7 @@ export function planDay({ items, person = {}, only = null, seed = {}, keep = nul
       Object.assign(l, { g, kcal: v.kcal * k, p: v.p * k, c: v.c * k, f: v.f * k, fib: (f.fib || 0) * k });
       Object.assign(m, sum(m.lines));
     };
-    for (let k = 0; k < 4; k++) {
+    for (let k = 0; k < 8; k++) {
       const d = sum(all.flatMap((m) => m.lines));
       const fp = (d.f * 9) / d.kcal;
       if (fp < 0.2 || (fp > 0.3 && d.f > T.fat * 1.1)) {
@@ -672,18 +702,48 @@ export function planDay({ items, person = {}, only = null, seed = {}, keep = nul
         for (const m of mains) {
           const oil = m.lines.find((l) => l.id === 'olio');
           if (oil && fp < 0.2 && oil.g < 20) resize(m, oil, oil.g + 5), (moved = true);
-          if (oil && fp > 0.3 && oil.g > 5) resize(m, oil, oil.g - 5), (moved = true);
+          if (oil && fp > 0.3 && oil.g > 5) resize(m, oil, Math.max(5, oil.g - 5)), (moved = true);
+        }
+        if (moved) continue;
+      }
+      // proteine fuori dai limiti: si ritocca la porzione proteica dei pasti principali (poi i carboidrati chiudono le calorie)
+      const pHi = d.p > T.pMax * 0.97;
+      const pLo = d.p < 0.92 * T.protein;
+      if (pHi || pLo) {
+        let moved = false;
+        for (const m of mains) {
+          const l = m.lines.find((x) => x.role === 'prot');
+          const f = l && BYID[l.id];
+          if (!f) continue;
+          const st = f.piece || f.step || 10;
+          const lo = f.piece ? f.min : round(f.min * 0.7, 10);
+          const ng = pHi ? Math.max(lo, l.g - st) : Math.min(f.max, l.g + st);
+          if (ng !== l.g) resize(m, l, ng), (moved = true);
         }
         if (moved) continue;
       }
       const gap = T.kcal - d.kcal;
       if (Math.abs(gap) / T.kcal <= 0.04) break;
       for (const m of mains) {
+        // calorie in più: prima si toglie il pane aggiunto
+        const extraBread = m.lines.find((x) => x.id === 'paneint' && m.lines.some((y) => y.role === 'carb' && y.id !== 'paneint'));
+        if (gap < 0 && extraBread) {
+          const ng = round(extraBread.g + ((gap / mains.length) / BYID.paneint.kcal) * 100, 10);
+          if (ng < 30) m.lines.splice(m.lines.indexOf(extraBread), 1), Object.assign(m, sum(m.lines));
+          else resize(m, extraBread, ng);
+          continue;
+        }
         const l = m.lines.find((x) => x.role === 'carb' && x.id !== 'paneint') || m.lines.find((x) => x.role === 'carb');
         if (!l) continue;
         const f = BYID[l.id];
         const ng = Math.min(f.max, Math.max(f.min, round(l.g + ((gap / mains.length) / n100(f, have).kcal) * 100, f.step)));
         if (ng !== l.g) resize(m, l, ng);
+        else if (gap > 0 && ng === f.max) {
+          // carboidrato già alla porzione massima: pane integrale (MN) fino a 150 g
+          let b = m.lines.find((x) => x.id === 'paneint');
+          if (!b && l.id !== 'paneint' && BYID[l.id].tag !== 'pane') m.lines.splice(m.lines.indexOf(l) + 1, 0, (b = line(BYID.paneint, 30, have, used)));
+          if (b && b.g < 150) resize(m, b, Math.min(150, Math.max(30, round(b.g + ((gap / mains.length) / BYID.paneint.kcal) * 100, 10))));
+        }
       }
     }
   }
@@ -697,10 +757,10 @@ export function planDay({ items, person = {}, only = null, seed = {}, keep = nul
   if (fullDay) {
     const diff = (day.kcal - T.kcal) / T.kcal;
     checks.push({ ok: Math.abs(diff) <= 0.1, txt: `Calorie ${Math.round(day.kcal)} su ${T.kcal} (${diff >= 0 ? '+' : ''}${Math.round(diff * 100)}%)` });
-    const pMax = Math.round(1.8 * T.w);
-    checks.push({ ok: day.p >= T.protein * 0.9 && day.p <= pMax, txt: `Proteine ${Math.round(day.p)} g (obiettivo ${T.protein} g, massimo prudente ${pMax} g: il doppio del raccomandato, ${MN})` });
+    const pMax = T.pMax;
+    checks.push({ ok: day.p >= T.protein * 0.9 && day.p <= pMax, txt: `Proteine ${Math.round(day.p)} g (obiettivo ${T.protein} g, massimo prudente ${pMax} g: ${T.sporty ? `2 g/kg, il tetto di ${PN} per chi si allena` : `il doppio del raccomandato, ${MN}`})` });
     checks.push({ ok: (day.f * 9) / day.kcal <= 0.35 && (day.f * 9) / day.kcal >= 0.195, txt: `Grassi ${Math.round(day.f)} g, ${Math.round(((day.f * 9) / day.kcal) * 100)}% delle calorie (${MN}: 20-35%)` });
-    checks.push({ ok: day.c / T.w >= 2, txt: `Carboidrati ${Math.round(day.c)} g, ${(day.c / T.w).toFixed(1)} g/kg` });
+    checks.push({ ok: day.c / T.wCalc >= 1.95, txt: `Carboidrati ${Math.round(day.c)} g, ${(day.c / T.wCalc).toFixed(1)} g/kg${T.wCalc !== T.w ? ` del peso desiderabile (${MN})` : ''} (${MN}: almeno 2)` });
     checks.push({ ok: vegG >= 400, txt: `Verdure ${vegG} g (almeno 400)` });
     checks.push({ ok: fruits >= 2, txt: `Frutta ${fruits} porzioni (${MN} 2-3, ${PN} 2)` });
     checks.push({ ok: day.fib >= 25, txt: `Fibre circa ${Math.round(day.fib)} g (${MN}: almeno 25)` });
