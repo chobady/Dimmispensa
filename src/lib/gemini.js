@@ -394,15 +394,27 @@ const DAY_SCHEMA = {
 // pantry: righe di testo già pronte; targets: { protein, veg } in grammi
 // diet: testo del file di una dieta (da un libro), tenuto solo sul dispositivo; può mancare
 const WEEKDAYS = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
-const dietBlock = (diet) =>
-  diet
-    ? `
+const dietBlock = (diet) => {
+  if (!diet) return '';
+  let out = '';
+  if (diet.text)
+    out += `
 
 DIETA DA SEGUIRE (dal libro dell'utente, in JSON o testo: interpretala tu). Ha la precedenza sugli obiettivi qui sopra quando sono in conflitto: rispetta cibi permessi e vietati, porzioni, abbinamenti e fasi. Se è divisa in giorni o settimane, oggi è ${WEEKDAYS[new Date().getDay()]}${diet.day ? ` e l'utente è al giorno ${diet.day} della dieta` : ''}: usa il giorno corrispondente.
 """
 ${String(diet.text).slice(0, 60000)}
-"""`
-    : '';
+"""`;
+  // libri di principi (linee guida generali, non un menu giorno per giorno): orientano scelte, quantità e spesa
+  (diet.guides || []).forEach((g) => {
+    out += `
+
+PRINCIPI DA SEGUIRE dal libro "${g.name}" (scelti dall'utente): usali per scegliere cibi, quantità, abbinamenti e cosa comprare. Se contraddicono gli obiettivi qui sopra, segui gli obiettivi e spiega la differenza nel consiglio. Le parti su malattie valgono solo se l'utente ne soffre.
+"""
+${String(g.text).slice(0, 70000)}
+"""`;
+  });
+  return out;
+};
 export async function dayPlan(key, pantry, targets, diet = null) {
   const prompt = `Sei un nutrizionista pratico. Proponi cosa mangiare OGGI usando soprattutto quello che c'è in casa.
 Obiettivi della giornata:
@@ -447,7 +459,7 @@ const SHOP_SCHEMA = {
   required: ['spesa'],
 };
 export async function dietShopping(key, pantry, diet, days = 7) {
-  const prompt = `Prepara la lista della spesa per i prossimi ${days} giorni seguendo questa dieta, per una persona.
+  const prompt = `Prepara la lista della spesa per i prossimi ${days} giorni seguendo la dieta e/o i principi qui sotto, per una persona.
 - Togli quello che c'è già in casa in quantità sufficiente (sotto c'è la dispensa).
 - Quantità realistiche da supermercato italiano (es. 500 g, 1 kg, 6 pz, 1 conf). Raggruppa (un solo "Petto di pollo 1 kg", non sette righe).
 - "nome": breve, in italiano, senza marca. "perche": a cosa serve, in poche parole (es. "pranzi di lun-mer").

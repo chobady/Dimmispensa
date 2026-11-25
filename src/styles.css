@@ -766,3 +766,4 @@ body.no-scroll { overflow: hidden; }
 .day-advice.compact summary::after { content: '+'; font-family: var(--font-title); font-size: 12px; margin-left: 4px; color: var(--ink-soft); }
 .day-advice.compact details[open] summary::after { content: '−'; }
 .box-hint { white-space: nowrap; }
+.targets .guide-row { align-items: center; gap: 8px; }

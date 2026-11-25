@@ -62,6 +62,8 @@ const LS_PLAN = 'dm_dayplan';
 const LS_TARGET = 'dm_targets';
 // la dieta resta SOLO su questo dispositivo (come i libri degli abbinamenti): non va su Firebase
 const LS_DIET = 'dm_diet';
+// libri di principi (linee guida generali): più d'uno, anche insieme alla dieta, sempre solo sul dispositivo
+const LS_GUIDES = 'dm_guides';
 const dayOfDiet = (diet) => {
   if (!diet?.start) return 0;
   const d = Math.floor((Date.parse(todayISO()) - Date.parse(diet.start)) / 86400000) + 1;
@@ -116,15 +118,18 @@ export default function DayAdvice({ compact = false }) {
   const [err, setErr] = useState('');
   const [edit, setEdit] = useState(false);
   const [diet, setDiet] = useState(() => lsGet(LS_DIET, null));
-  const dietArg = diet ? { text: diet.text, day: dayOfDiet(diet) } : null;
+  const [guides, setGuides] = useState(() => lsGet(LS_GUIDES, []));
+  const dietArg = diet || guides.length ? { text: diet?.text || '', day: diet ? dayOfDiet(diet) : 0, guides: guides.map((g) => ({ name: g.name, text: g.text })) } : null;
+  const hasRules = !!(diet || guides.length);
   const fileRef = useRef(null);
+  const guideRef = useRef(null);
   const [shop, setShop] = useState(null); // { spesa, nota } della dieta
   const [shopBusy, setShopBusy] = useState(false);
   const [pick, setPick] = useState({});
   const [days, setDays] = useState(7);
   const today = todayISO();
   const plan = saved && saved.date === today ? saved.plan : null;
-  const sig = useMemo(() => sigOf(items) + '|' + (diet ? diet.importedAt + ':' + (diet.start || '') : ''), [items, diet]);
+  const sig = useMemo(() => sigOf(items) + '|' + (diet ? diet.importedAt + ':' + (diet.start || '') : '') + '|' + guides.map((g) => g.importedAt).join(','), [items, diet, guides]);
   const stale = plan && saved.sig !== sig;
 
   const run = async () => {
@@ -182,15 +187,42 @@ export default function DayAdvice({ compact = false }) {
     toast(`${name}: aggiunto alla spesa.`);
   };
 
+  const readBook = async (file) => {
+    let text = await file.text();
+    try {
+      text = JSON.stringify(JSON.parse(text)); // JSON compatto: meno spazio e meno quota di Gemini
+    } catch {
+      /* non è JSON: va bene anche il testo */
+    }
+    return text;
+  };
+  const importGuide = async (file) => {
+    if (!file) return;
+    try {
+      const text = await readBook(file);
+      if (text.length > 400000) throw new Error('Il file è troppo grande (oltre 400 KB).');
+      const g = { name: file.name.replace(/\.(json|txt)$/i, '').replace(/[_-]+/g, ' '), text, size: text.length, importedAt: Date.now() };
+      const next = [...guides.filter((x) => x.name !== g.name), g];
+      if (!lsSet(LS_GUIDES, next)) throw new Error('Spazio finito sul dispositivo.');
+      setGuides(next);
+      setShop(null);
+      play('add');
+      toast(`Principi "${g.name}" aggiunti: menu e spesa ne terranno conto.`);
+      if (text.length > 70000) toast('Il file è lungo: a Gemini mando solo i primi 70.000 caratteri.', { err: true });
+    } catch (e) {
+      toast(e.message || 'Non riesco a leggere il file.', { err: true });
+    }
+  };
+  const dropGuide = (at) => {
+    const next = guides.filter((g) => g.importedAt !== at);
+    lsSet(LS_GUIDES, next);
+    setGuides(next);
+    setShop(null);
+  };
   const importDiet = async (file) => {
     if (!file) return;
     try {
-      let text = await file.text();
-      try {
-        text = JSON.stringify(JSON.parse(text)); // JSON compatto: meno spazio e meno quota di Gemini
-      } catch {
-        /* non è JSON: va bene anche il testo */
-      }
+      const text = await readBook(file);
       if (text.length > 400000) throw new Error('Il file è troppo grande (oltre 400 KB): tieni solo la parte della dieta che segui.');
       const d = { name: file.name.replace(/\.(json|txt)$/i, ''), text, size: text.length, importedAt: Date.now(), start: todayISO() };
       if (!lsSet(LS_DIET, d)) throw new Error('Spazio finito sul dispositivo.');
@@ -209,7 +241,7 @@ export default function DayAdvice({ compact = false }) {
     setDiet(d);
   };
   const runShop = async () => {
-    if (!key || !diet || shopBusy) return;
+    if (!key || !hasRules || shopBusy) return;
     setShopBusy(true);
     try {
       const r = await dietShopping(key, pantryText(items), dietArg, days);
@@ -305,6 +337,24 @@ export default function DayAdvice({ compact = false }) {
               )}
               <input ref={fileRef} type="file" accept=".json,.txt,application/json,text/plain" hidden onChange={(e) => (importDiet(e.target.files?.[0]), (e.target.value = ''))} />
             </div>
+            <div className="diet-ctl">
+              <b className="small">Libri di principi</b>
+              <p className="small muted">Linee guida generali (non un menu giorno per giorno): puoi caricarne più d'uno, anche insieme alla dieta. Restano su questo dispositivo.</p>
+              {guides.map((g) => (
+                <div className="row guide-row" key={g.importedAt}>
+                  <span className="small grow">
+                    {g.name} <span className="muted">· {Math.round(g.size / 1000)} KB</span>
+                  </span>
+                  <Btn sm color="red" onClick={() => dropGuide(g.importedAt)}>
+                    Togli
+                  </Btn>
+                </div>
+              ))}
+              <Btn sm icon="1f4dd" onClick={() => guideRef.current?.click()}>
+                Aggiungi un libro di principi
+              </Btn>
+              <input ref={guideRef} type="file" accept=".json,.txt,application/json,text/plain" hidden onChange={(e) => (importGuide(e.target.files?.[0]), (e.target.value = ''))} />
+            </div>
           </div>
         ) : (
           <p className="small muted">
@@ -318,6 +368,7 @@ export default function DayAdvice({ compact = false }) {
                 Obiettivo: {targets.protein} g di proteine e {targets.veg} g di verdure, pochi zuccheri e grassi.
               </>
             )}
+            {guides.length ? ` Principi: ${guides.map((g) => g.name).join(', ')}.` : ''}
           </p>
         )}
 
@@ -376,11 +427,11 @@ export default function DayAdvice({ compact = false }) {
         )}
       </Box>
 
-      {diet && key && (
-        <Box compact={compact} icon="1f9fe" title="Spesa della dieta">
+      {hasRules && key && (
+        <Box compact={compact} icon="1f9fe" title={diet ? 'Spesa della dieta' : 'Spesa secondo i principi'}>
           {!shop ? (
             <>
-              <p className="small muted">Cosa comprare per seguire {diet.name}, tolto quello che hai già.</p>
+              <p className="small muted">Cosa comprare per seguire {[diet?.name, ...guides.map((g) => g.name)].filter(Boolean).join(' e ')}, tolto quello che hai già.</p>
               <div className="row">
                 <select className="input pick grow" value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Per quanti giorni">
                   <option value={3}>Per 3 giorni</option>
