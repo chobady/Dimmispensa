@@ -135,6 +135,8 @@ export default function Pantry() {
             )}
           </div>
 
+          {!wide && items.length > 0 && <DayAdvice compact />}
+
           <div className="list">
             {groups.map(({ item: it, n }) => (
               <ItemCard key={it.id} item={it} count={n} onOpen={openItem} gone={goneIds.has(it.id)} />
@@ -156,7 +158,6 @@ export default function Pantry() {
               </Btn>
             </div>
           )}
-          {!wide && items.length > 0 && <DayAdvice />}
         </div>
         {wide && <DayAdvice />}
       </div>

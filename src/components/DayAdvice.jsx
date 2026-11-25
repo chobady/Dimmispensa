@@ -105,7 +105,7 @@ const sigOf = (items) =>
     .sort()
     .join(',');
 
-export default function DayAdvice() {
+export default function DayAdvice({ compact = false }) {
   const { state, go, toast } = useApp();
   const items = state.items;
   const key = state.pantry?.geminiKey || '';
@@ -258,13 +258,11 @@ export default function DayAdvice() {
   };
 
   return (
-    <aside className="day-advice">
-      <section className="win advice-box">
-        <div className="advice-head">
-          <Icon id="1f37d" size={20} />
-          <h2 className="title grow">Oggi da mangiare</h2>
+    <aside className={'day-advice' + (compact ? ' compact' : '')}>
+      <Box compact={compact} icon="1f37d" title="Oggi da mangiare" hint={plan ? `${plan.pasti.length} pasti` : ''}>
+        <div className="advice-tools">
           <button type="button" className="link-btn small" onClick={() => setEdit(!edit)}>
-            {edit ? 'Fatto' : 'Obiettivi'}
+            {edit ? 'Fatto' : 'Obiettivi e dieta'}
           </button>
         </div>
         {edit ? (
@@ -376,14 +374,10 @@ export default function DayAdvice() {
             Proponi il menu di oggi
           </Btn>
         )}
-      </section>
+      </Box>
 
       {diet && key && (
-        <section className="win advice-box">
-          <div className="advice-head">
-            <Icon id="1f9fe" size={20} />
-            <h2 className="title grow">Spesa della dieta</h2>
-          </div>
+        <Box compact={compact} icon="1f9fe" title="Spesa della dieta">
           {!shop ? (
             <>
               <p className="small muted">Cosa comprare per seguire {diet.name}, tolto quello che hai già.</p>
@@ -424,14 +418,10 @@ export default function DayAdvice() {
               </div>
             </>
           )}
-        </section>
+        </Box>
       )}
 
-      <section className="win advice-box">
-        <div className="advice-head">
-          <Icon id="1f6d2" size={20} />
-          <h2 className="title grow">Manca in casa</h2>
-        </div>
+      <Box compact={compact} icon="1f6d2" title="Manca in casa" hint={missing.length ? `${missing.length}` : ''}>
         {missing.length ? (
           <>
             <p className="small muted">Le cose di base che non vedo in dispensa. Tocca per metterle nella spesa.</p>
@@ -452,7 +442,7 @@ export default function DayAdvice() {
         ) : (
           <p className="small">Hai tutte le cose di base.</p>
         )}
-      </section>
+      </Box>
     </aside>
   );
 }
@@ -474,5 +464,38 @@ function Meter({ label, value, target }) {
         />
       </span>
     </div>
+  );
+}
+
+// riquadro: sul telefono si apre e chiude toccando il titolo (la dispensa resta in primo piano)
+function Box({ compact, icon, title, hint, children }) {
+  const k = 'dm_box_' + icon;
+  const [open, setOpen] = useState(() => lsGet(k, false));
+  const head = (
+    <>
+      <Icon id={icon} size={20} />
+      <h2 className="title grow">{title}</h2>
+      {compact && hint ? <span className="small muted box-hint">{hint}</span> : null}
+    </>
+  );
+  if (!compact)
+    return (
+      <section className="win advice-box">
+        <div className="advice-head">{head}</div>
+        {children}
+      </section>
+    );
+  return (
+    <details
+      className="win advice-box"
+      open={open}
+      onToggle={(e) => {
+        setOpen(e.currentTarget.open);
+        lsSet(k, e.currentTarget.open);
+      }}
+    >
+      <summary className="advice-head">{head}</summary>
+      {children}
+    </details>
   );
 }

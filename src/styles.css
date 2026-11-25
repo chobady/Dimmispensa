@@ -757,3 +757,12 @@ body.no-scroll { overflow: hidden; }
 .diet-shop .opt-check { align-items: flex-start; }
 .diet-shop .opt-check input { margin-top: 2px; flex: none; }
 .diet-shop .why { display: block; font-size: 14px; color: var(--ink-soft); }
+.advice-tools { display: flex; justify-content: flex-end; margin-top: -4px; }
+.day-advice.compact { margin: 0 0 16px; gap: 8px; }
+.day-advice.compact .advice-box { padding: 10px 12px; display: block; }
+.day-advice.compact details > :not(summary) { margin-top: 10px; }
+.day-advice.compact summary { list-style: none; cursor: pointer; }
+.day-advice.compact summary::-webkit-details-marker { display: none; }
+.day-advice.compact summary::after { content: '+'; font-family: var(--font-title); font-size: 12px; margin-left: 4px; color: var(--ink-soft); }
+.day-advice.compact details[open] summary::after { content: '−'; }
+.box-hint { white-space: nowrap; }
