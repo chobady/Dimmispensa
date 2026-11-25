@@ -386,6 +386,8 @@ const DAY_SCHEMA = {
     },
     proteine_tot: { type: 'NUMBER' },
     verdure_tot: { type: 'NUMBER' },
+    kcal_tot: { type: 'NUMBER' },
+    fabbisogno: { type: 'STRING' },
     consiglio: { type: 'STRING' },
     da_comprare: { type: 'ARRAY', items: { type: 'STRING' } },
   },
@@ -394,9 +396,38 @@ const DAY_SCHEMA = {
 // pantry: righe di testo già pronte
 // diet: testo del file di una dieta (da un libro), tenuto solo sul dispositivo; può mancare
 const WEEKDAYS = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+const ACT = {
+  sedentario: 'sedentario (lavoro seduto, si sposta in auto, niente sport)',
+  poco: 'poco attivo (lavoro in movimento o qualche camminata)',
+  attivo: 'attivo (in movimento tutto il giorno o sport quasi ogni giorno)',
+  molto: 'molto attivo (lavoro pesante o sport intenso tutti i giorni)',
+};
+const GOAL = { dimagrire: 'perdere grasso', mantenere: 'mantenere il peso', massa: 'aumentare la massa muscolare', salute: 'stare in salute' };
+// dati della persona (solo sul dispositivo): servono alle formule dei libri
+const personBlock = (p) => {
+  if (!p || !(p.peso || p.altezza || p.eta)) return '';
+  const r = [];
+  if (p.sesso) r.push(`sesso: ${p.sesso === 'f' ? 'donna' : 'uomo'}`);
+  if (p.eta) r.push(`età: ${p.eta} anni`);
+  if (p.peso) r.push(`peso: ${p.peso} kg`);
+  if (p.altezza) r.push(`altezza: ${p.altezza} cm`);
+  if (p.grasso) r.push(`massa grassa: ${p.grasso}%`);
+  if (p.attivita) r.push(`attività quotidiana: ${ACT[p.attivita] || p.attivita}`);
+  if (p.passi) r.push(`passi al giorno: circa ${p.passi}`);
+  if (p.allenamenti) r.push(`allenamenti a settimana: ${p.allenamenti}${p.sport ? ` (${p.sport})` : ''}`);
+  if (p.obiettivo) r.push(`obiettivo: ${GOAL[p.obiettivo] || p.obiettivo}`);
+  if (p.note) r.push(`note dell'utente: ${p.note}`);
+  const wd = new Date().getDay();
+  if (p.giorniAllenamento?.length) r.push(`oggi ${p.giorniAllenamento.includes(wd) ? 'si allena' : 'NON si allena'}`);
+  return `
+
+DATI DELL'UTENTE (usali con le formule e le tabelle dei libri, o con quelle standard se non ci sono libri, per calcolare calorie e grammi di oggi):
+${r.map((x) => '- ' + x).join('\n')}
+In "fabbisogno" scrivi in una riga come hai calcolato le calorie di oggi (formula usata e risultato); "kcal_tot" sono le calorie del menu.`;
+};
 const dietBlock = (diet) => {
   if (!diet) return '';
-  let out = '';
+  let out = personBlock(diet.person);
   if (diet.text)
     out += `
 
@@ -428,6 +459,7 @@ Regole:
 - 3 pasti principali più gli spuntini che servono.
 - "ingredienti": righe brevi con quantità, es. "Petto di pollo 150 g". Indica con "(da comprare)" quello che non c'è in casa.
 - "proteine_g" e "verdure_g": stime per quel pasto (grammi di proteine come nutriente, grammi di verdura come peso); "proteine_tot" e "verdure_tot": somme della giornata.
+- "kcal_tot": calorie stimate di tutto il menu.
 - "consiglio": una o due frasi pratiche (es. cosa preparare in anticipo, o quale principio dei libri hai seguito).
 - "da_comprare": solo le cose che mancano per questo menu, nomi brevi in italiano.
 Rispondi in italiano, solo JSON.${dietBlock(diet)}
@@ -461,6 +493,7 @@ const SHOP_SCHEMA = {
   required: ['spesa'],
 };
 export async function dietShopping(key, pantry, diet, days = 7) {
+  // la spesa non ha bisogno della riga sul fabbisogno: basta che le quantità tengano conto dei dati
   const prompt = `Prepara la lista della spesa per i prossimi ${days} giorni seguendo la dieta e/o i principi qui sotto, per una persona.
 - Togli quello che c'è già in casa in quantità sufficiente (sotto c'è la dispensa).
 - Quantità realistiche da supermercato italiano (es. 500 g, 1 kg, 6 pz, 1 conf). Raggruppa (un solo "Petto di pollo 1 kg", non sette righe).

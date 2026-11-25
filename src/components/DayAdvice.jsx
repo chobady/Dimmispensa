@@ -63,6 +63,9 @@ const LS_PLAN = 'dm_dayplan';
 const LS_DIET = 'dm_diet';
 // libri di principi (linee guida generali): più d'uno, anche insieme alla dieta, sempre solo sul dispositivo
 const LS_GUIDES = 'dm_guides';
+// dati della persona (peso, altezza...): solo su questo dispositivo
+const LS_PERSON = 'dm_person';
+const WD = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
 const dayOfDiet = (diet) => {
   if (!diet?.start) return 0;
   const d = Math.floor((Date.parse(todayISO()) - Date.parse(diet.start)) / 86400000) + 1;
@@ -117,7 +120,14 @@ export default function DayAdvice({ compact = false }) {
   const [edit, setEdit] = useState(false);
   const [diet, setDiet] = useState(() => lsGet(LS_DIET, null));
   const [guides, setGuides] = useState(() => lsGet(LS_GUIDES, []));
-  const dietArg = diet || guides.length ? { text: diet?.text || '', day: diet ? dayOfDiet(diet) : 0, guides: guides.map((g) => ({ name: g.name, text: g.text })) } : null;
+  const [person, setPerson] = useState(() => lsGet(LS_PERSON, {}));
+  const hasPerson = !!(person.peso || person.altezza || person.eta);
+  const setP = (k, v) => {
+    const next = { ...person, [k]: v };
+    setPerson(next);
+    lsSet(LS_PERSON, next);
+  };
+  const dietArg = diet || guides.length || hasPerson ? { text: diet?.text || '', day: diet ? dayOfDiet(diet) : 0, guides: guides.map((g) => ({ name: g.name, text: g.text })), person } : null;
   const hasRules = !!(diet || guides.length);
   const fileRef = useRef(null);
   const guideRef = useRef(null);
@@ -127,7 +137,7 @@ export default function DayAdvice({ compact = false }) {
   const [days, setDays] = useState(7);
   const today = todayISO();
   const plan = saved && saved.date === today ? saved.plan : null;
-  const sig = useMemo(() => sigOf(items) + '|' + (diet ? diet.importedAt + ':' + (diet.start || '') : '') + '|' + guides.map((g) => g.importedAt).join(','), [items, diet, guides]);
+  const sig = useMemo(() => sigOf(items) + '|' + (diet ? diet.importedAt + ':' + (diet.start || '') : '') + '|' + guides.map((g) => g.importedAt).join(',') + '|' + JSON.stringify(person), [items, diet, guides, person]);
   const stale = plan && saved.sig !== sig;
 
   const run = async () => {
@@ -291,11 +301,86 @@ export default function DayAdvice({ compact = false }) {
       <Box compact={compact} icon="1f37d" title="Oggi da mangiare" hint={plan ? `${plan.pasti.length} pasti` : ''}>
         <div className="advice-tools">
           <button type="button" className="link-btn small" onClick={() => setEdit(!edit)}>
-            {edit ? 'Fatto' : 'Libri e dieta'}
+            {edit ? 'Fatto' : 'I tuoi dati e libri'}
           </button>
         </div>
         {edit ? (
           <div className="targets">
+            <b className="small span2">I tuoi dati</b>
+            <p className="small muted span2">Servono ai libri per calcolare calorie e grammi. Restano su questo dispositivo.</p>
+            <label className="field">
+              <span>Sesso</span>
+              <select className="input pick" value={person.sesso || ''} onChange={(e) => setP('sesso', e.target.value)}>
+                <option value="">—</option>
+                <option value="m">Uomo</option>
+                <option value="f">Donna</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Età</span>
+              <input className="input" type="number" inputMode="decimal" placeholder="anni" value={person.eta ?? ''} onChange={(e) => setP('eta', e.target.value === '' ? '' : Number(e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Peso (kg)</span>
+              <input className="input" type="number" inputMode="decimal" placeholder="kg" value={person.peso ?? ''} onChange={(e) => setP('peso', e.target.value === '' ? '' : Number(e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Altezza (cm)</span>
+              <input className="input" type="number" inputMode="decimal" placeholder="cm" value={person.altezza ?? ''} onChange={(e) => setP('altezza', e.target.value === '' ? '' : Number(e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Massa grassa % (se la sai)</span>
+              <input className="input" type="number" inputMode="decimal" placeholder="facoltativo" value={person.grasso ?? ''} onChange={(e) => setP('grasso', e.target.value === '' ? '' : Number(e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Passi al giorno</span>
+              <input className="input" type="number" inputMode="decimal" placeholder="circa" value={person.passi ?? ''} onChange={(e) => setP('passi', e.target.value === '' ? '' : Number(e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Movimento nella giornata</span>
+              <select className="input pick" value={person.attivita || ''} onChange={(e) => setP('attivita', e.target.value)}>
+                <option value="">—</option>
+                <option value="sedentario">Sedentario</option>
+                <option value="poco">Poco attivo</option>
+                <option value="attivo">Attivo</option>
+                <option value="molto">Molto attivo</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Obiettivo</span>
+              <select className="input pick" value={person.obiettivo || ''} onChange={(e) => setP('obiettivo', e.target.value)}>
+                <option value="">—</option>
+                <option value="dimagrire">Perdere grasso</option>
+                <option value="mantenere">Mantenere il peso</option>
+                <option value="massa">Aumentare massa</option>
+                <option value="salute">Stare in salute</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Allenamenti a settimana</span>
+              <input className="input" type="number" inputMode="decimal" placeholder="0" value={person.allenamenti ?? ''} onChange={(e) => setP('allenamenti', e.target.value === '' ? '' : Number(e.target.value))} />
+            </label>
+            <label className="field">
+              <span>Che sport</span>
+              <input className="input" placeholder="es. pesi, corsa" value={person.sport || ''} onChange={(e) => setP('sport', e.target.value)} />
+            </label>
+            <div className="field span2">
+              <span>Giorni in cui ti alleni</span>
+              <div className="chips">
+                {[1, 2, 3, 4, 5, 6, 0].map((d) => {
+                  const on = (person.giorniAllenamento || []).includes(d);
+                  return (
+                    <button key={d} type="button" className={'chip' + (on ? ' on' : '')} aria-pressed={on} onClick={() => setP('giorniAllenamento', on ? person.giorniAllenamento.filter((x) => x !== d) : [...(person.giorniAllenamento || []), d])}>
+                      {WD[d]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <label className="field span2">
+              <span>Altro da sapere (facoltativo)</span>
+              <input className="input" placeholder="es. vegetariano, niente lattosio" value={person.note || ''} onChange={(e) => setP('note', e.target.value)} />
+            </label>
             <div className="diet-ctl">
               <b className="small">Dieta da un libro</b>
               {diet ? (
@@ -354,10 +439,11 @@ export default function DayAdvice({ compact = false }) {
               </>
             ) : (
               <>
-                {guides.length ? '' : 'Nessun libro caricato: uso le linee guida italiane. Caricali da "Libri e dieta".'}
+                {guides.length ? '' : 'Nessun libro caricato: uso le linee guida italiane. Caricali da "I tuoi dati e libri".'}
               </>
             )}
             {guides.length ? `Segue i tuoi libri: ${guides.map((g) => g.name).join(', ')}.` : ''}
+            {hasPerson ? ` Calcolato su: ${[person.sesso ? (person.sesso === 'f' ? 'donna' : 'uomo') : '', person.eta ? person.eta + ' anni' : '', person.peso ? person.peso + ' kg' : '', person.altezza ? person.altezza + ' cm' : ''].filter(Boolean).join(', ')}.` : ' Aggiungi i tuoi dati (peso, altezza...) per avere quantità su misura.'}
           </p>
         )}
 
@@ -391,7 +477,9 @@ export default function DayAdvice({ compact = false }) {
             <div className="plan-tot">
               <Meter label="Proteine" value={plan.proteine_tot} />
               <Meter label="Verdure" value={plan.verdure_tot} />
+              {plan.kcal_tot ? <Meter label="Calorie" value={plan.kcal_tot} unit="kcal" /> : null}
             </div>
+            {plan.fabbisogno && <p className="small muted">{plan.fabbisogno}</p>}
             {plan.consiglio && <p className="small">{plan.consiglio}</p>}
             {plan.da_comprare?.length > 0 && (
               <div className="chips">
@@ -488,11 +576,11 @@ export default function DayAdvice({ compact = false }) {
 }
 
 // stima della giornata (gli obiettivi ora vengono dai libri)
-function Meter({ label, value }) {
+function Meter({ label, value, unit = 'g' }) {
   return (
     <div className="meter">
       <span className="small">
-        {label} <b>{Math.round(Number(value) || 0)} g</b> <span className="muted">stimati</span>
+        {label} <b>{Math.round(Number(value) || 0)} {unit}</b> <span className="muted">{unit === 'kcal' ? 'stimate' : 'stimati'}</span>
       </span>
     </div>
   );
