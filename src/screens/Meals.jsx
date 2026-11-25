@@ -548,7 +548,7 @@ function EntrySheet({ date, slot, entry, item, onClose, onRemove }) {
           <div className="grow">
             <p className="nm">{entry.name}{entry.item && (entry.qty || entry.all) ? ` · ${portionLabel(entry)}` : ''}</p>
             <p className="small muted">
-              {item ? `In dispensa: ${qtyLabel(item)} · ${expiryLabel(item.expiry, item.est)}` : entry.item ? 'Non è più in dispensa.' : entry.recipe ? 'Ricetta da Mela.' : 'Piatto scritto a mano, non dalla dispensa.'}
+              {item ? `In dispensa: ${qtyLabel(item)} · ${expiryLabel(item.expiry, item.est)}` : entry.item ? 'Non è più in dispensa.' : entry.recipe ? 'Ricetta da Mela.' : entry.note ? entry.note : 'Piatto scritto a mano, non dalla dispensa.'}
             </p>
           </div>
         </div>

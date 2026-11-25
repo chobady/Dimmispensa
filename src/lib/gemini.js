@@ -387,6 +387,7 @@ const DAY_SCHEMA = {
     proteine_tot: { type: 'NUMBER' },
     verdure_tot: { type: 'NUMBER' },
     kcal_tot: { type: 'NUMBER' },
+    regole: { type: 'ARRAY', items: { type: 'STRING' } },
     fabbisogno: { type: 'STRING' },
     consiglio: { type: 'STRING' },
     da_comprare: { type: 'ARRAY', items: { type: 'STRING' } },
@@ -439,7 +440,7 @@ ${String(diet.text).slice(0, 60000)}
   (diet.guides || []).forEach((g) => {
     out += `
 
-PRINCIPI DA SEGUIRE dal libro "${g.name}" (scelti dall'utente): usali per scegliere cibi, quantità, abbinamenti e cosa comprare. Se due libri si contraddicono, scegli l'indicazione più prudente e dillo in breve nel consiglio. Le parti su malattie valgono solo se l'utente ne soffre.
+LIBRO "${g.name}" (scelto dall'utente; vanno seguiti TUTTI i libri insieme, non uno solo): usalo per scegliere cibi, quantità, condimenti, cotture, abbinamenti e cosa comprare. Se contiene una dieta divisa in giorni o settimane, oggi è ${WEEKDAYS[new Date().getDay()]}. Se due libri si contraddicono, scegli l'indicazione più prudente e dillo in breve nel consiglio. Le parti su malattie valgono solo se l'utente ne soffre.
 """
 ${String(g.text).slice(0, 70000)}
 """`;
@@ -451,7 +452,8 @@ export async function dayPlan(key, pantry, diet = null) {
   const prompt = `Sei un nutrizionista pratico. Proponi cosa mangiare OGGI usando soprattutto quello che c'è in casa.
 ${
   books
-    ? `Segui i libri dell'utente qui sotto: da lì prendi calorie, quantità di proteine, carboidrati, grassi, verdure e frutta, porzioni, cibi da preferire e da limitare. Non inventare obiettivi diversi da quelli dei libri.`
+    ? `Segui TUTTI i libri dell'utente qui sotto, insieme: da lì prendi calorie, quantità di proteine, carboidrati, grassi, verdure e frutta, porzioni, cibi da preferire e da limitare, condimenti e cotture. Non inventare obiettivi diversi da quelli dei libri.
+Prima di rispondere ricontrolla ogni ingrediente con i libri: se un libro lo sconsiglia o dice di limitarlo (per esempio un olio o un taglio di carne che i libri sconsigliano), NON usarlo anche se è in casa: metti l'alternativa indicata dai libri e segnala "(da comprare)". In "regole" elenca le regole dei libri che hai applicato, ognuna con il nome del libro tra parentesi.`
     : `Segui una dieta mediterranea equilibrata secondo le linee guida italiane: verdura e frutta abbondanti, cereali integrali, legumi, pesce, olio extravergine misurato, pochi zuccheri, sale e grassi saturi.`
 }
 Regole:

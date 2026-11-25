@@ -66,11 +66,6 @@ const LS_GUIDES = 'dm_guides';
 // dati della persona (peso, altezza...): solo su questo dispositivo
 const LS_PERSON = 'dm_person';
 const WD = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
-const dayOfDiet = (diet) => {
-  if (!diet?.start) return 0;
-  const d = Math.floor((Date.parse(todayISO()) - Date.parse(diet.start)) / 86400000) + 1;
-  return d > 0 ? d : 0;
-};
 const lsGet = (k, d) => {
   try {
     return JSON.parse(localStorage.getItem(k)) ?? d;
@@ -118,8 +113,18 @@ export default function DayAdvice({ compact = false }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [edit, setEdit] = useState(false);
-  const [diet, setDiet] = useState(() => lsGet(LS_DIET, null));
-  const [guides, setGuides] = useState(() => lsGet(LS_GUIDES, []));
+  const diet = null; // la vecchia "dieta" singola ora è uno dei libri
+  const [guides, setGuides] = useState(() => {
+    const g = lsGet(LS_GUIDES, []);
+    const d = lsGet(LS_DIET, null);
+    if (!d) return g;
+    // sposta il file caricato come dieta tra i libri (una volta sola)
+    const name = String(d.name || 'dieta').replace(/[_-]+/g, ' ');
+    const next = g.some((x) => x.name === name || x.text === d.text) ? g : [...g, { name, text: d.text, size: d.size || String(d.text).length, importedAt: d.importedAt || Date.now() }];
+    lsSet(LS_GUIDES, next);
+    localStorage.removeItem(LS_DIET);
+    return next;
+  });
   const [person, setPerson] = useState(() => lsGet(LS_PERSON, {}));
   const hasPerson = !!(person.peso || person.altezza || person.eta);
   const setP = (k, v) => {
@@ -127,9 +132,8 @@ export default function DayAdvice({ compact = false }) {
     setPerson(next);
     lsSet(LS_PERSON, next);
   };
-  const dietArg = diet || guides.length || hasPerson ? { text: diet?.text || '', day: diet ? dayOfDiet(diet) : 0, guides: guides.map((g) => ({ name: g.name, text: g.text })), person } : null;
+  const dietArg = guides.length || hasPerson ? { text: '', day: 0, guides: guides.map((g) => ({ name: g.name, text: g.text })), person } : null;
   const hasRules = !!(diet || guides.length);
-  const fileRef = useRef(null);
   const guideRef = useRef(null);
   const [shop, setShop] = useState(null); // { spesa, nota } della dieta
   const [shopBusy, setShopBusy] = useState(false);
@@ -235,27 +239,6 @@ export default function DayAdvice({ compact = false }) {
     setGuides(next);
     setShop(null);
   };
-  const importDiet = async (file) => {
-    if (!file) return;
-    try {
-      const text = await readBook(file);
-      if (text.length > 400000) throw new Error('Il file è troppo grande (oltre 400 KB): tieni solo la parte della dieta che segui.');
-      const d = { name: file.name.replace(/\.(json|txt)$/i, ''), text, size: text.length, importedAt: Date.now(), start: todayISO() };
-      if (!lsSet(LS_DIET, d)) throw new Error('Spazio finito sul dispositivo.');
-      setDiet(d);
-      setShop(null);
-      play('add');
-      toast(`Dieta "${d.name}" caricata: da ora il menu la segue.`);
-      if (text.length > 60000) toast('Il file è lungo: a Gemini mando solo i primi 60.000 caratteri.', { err: true });
-    } catch (e) {
-      toast(e.message || 'Non riesco a leggere il file.', { err: true });
-    }
-  };
-  const setDiet2 = (d) => {
-    if (d) lsSet(LS_DIET, d);
-    else localStorage.removeItem(LS_DIET);
-    setDiet(d);
-  };
   const runShop = async () => {
     if (!key || !hasRules || shopBusy) return;
     setShopBusy(true);
@@ -294,6 +277,21 @@ export default function DayAdvice({ compact = false }) {
     play('add');
     toast(n ? `${n} cose aggiunte alla spesa.` : 'Erano già tutte nella lista.');
     setShop(null);
+  };
+
+  // dal menu di Gemini ai Pasti di oggi: un piatto per pasto, con gli ingredienti come nota
+  const SLOT = { Colazione: 'colazione', Spuntino: 'snack', Merenda: 'snack', Pranzo: 'pranzo', Cena: 'cena' };
+  const inMeals = (m) => (state.meals?.[today]?.[SLOT[m.pasto] || 'snack'] || []).some((e) => e.name === m.piatto);
+  const toMeals = (list) => {
+    const bySlot = {};
+    list.filter((m) => !inMeals(m)).forEach((m) => {
+      const slot = SLOT[m.pasto] || 'snack';
+      (bySlot[slot] ||= []).push({ id: newId(), item: null, name: m.piatto, icon: '1f37d', note: m.ingredienti.join(' · '), fromPlan: true });
+    });
+    Object.entries(bySlot).forEach(([slot, add]) => actions.setMealSlot(today, slot, [...(state.meals?.[today]?.[slot] || []), ...add]));
+    const n = Object.values(bySlot).flat().length;
+    play('add');
+    toast(n > 1 ? `${n} piatti messi nei Pasti di oggi.` : 'Messo nei Pasti di oggi.', { action: { label: 'Vedi', fn: () => go('pasti') } });
   };
 
   return (
@@ -382,36 +380,6 @@ export default function DayAdvice({ compact = false }) {
               <input className="input" placeholder="es. vegetariano, niente lattosio" value={person.note || ''} onChange={(e) => setP('note', e.target.value)} />
             </label>
             <div className="diet-ctl">
-              <b className="small">Dieta da un libro</b>
-              {diet ? (
-                <>
-                  <p className="small">
-                    {diet.name} <span className="muted">· {Math.round(diet.size / 1000)} KB, solo su questo dispositivo</span>
-                  </p>
-                  <label className="field">
-                    <span>Ho iniziato il (per contare i giorni della dieta)</span>
-                    <input className="input" type="date" value={diet.start || ''} onChange={(e) => setDiet2({ ...diet, start: e.target.value })} />
-                  </label>
-                  <div className="row">
-                    <Btn sm onClick={() => fileRef.current?.click()}>
-                      Sostituisci
-                    </Btn>
-                    <Btn sm color="red" onClick={() => setDiet2(null)}>
-                      Togli la dieta
-                    </Btn>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p className="small muted">Carica il file JSON (o di testo) con la dieta: il menu del giorno e la spesa la seguiranno. Il file resta su questo dispositivo.</p>
-                  <Btn sm icon="1f4e6" onClick={() => fileRef.current?.click()}>
-                    Carica il file della dieta
-                  </Btn>
-                </>
-              )}
-              <input ref={fileRef} type="file" accept=".json,.txt,application/json,text/plain" hidden onChange={(e) => (importDiet(e.target.files?.[0]), (e.target.value = ''))} />
-            </div>
-            <div className="diet-ctl">
               <b className="small">I tuoi libri</b>
               <p className="small muted">Il menu e la spesa seguono questi libri. Puoi sceglierne più di uno alla volta. Restano su questo dispositivo.</p>
               {guides.map((g) => (
@@ -432,19 +400,14 @@ export default function DayAdvice({ compact = false }) {
           </div>
         ) : (
           <p className="small muted">
-            {diet ? (
-              <>
-                Segue la dieta <b>{diet.name}</b>
-                {dayOfDiet(diet) ? `, giorno ${dayOfDiet(diet)}` : ''}.
-              </>
-            ) : (
-              <>
-                {guides.length ? '' : 'Nessun libro caricato: uso le linee guida italiane. Caricali da "I tuoi dati e libri".'}
-              </>
-            )}
-            {guides.length ? `Segue i tuoi libri: ${guides.map((g) => g.name).join(', ')}.` : ''}
-            {hasPerson ? ` Calcolato su: ${[person.sesso ? (person.sesso === 'f' ? 'donna' : 'uomo') : '', person.eta ? person.eta + ' anni' : '', person.peso ? person.peso + ' kg' : '', person.altezza ? person.altezza + ' cm' : ''].filter(Boolean).join(', ')}.` : ' Aggiungi i tuoi dati (peso, altezza...) per avere quantità su misura.'}
+            {guides.length ? `Segue tutti i tuoi libri insieme: ${guides.map((g) => g.name).join(', ')}.` : 'Nessun libro caricato: uso le linee guida italiane.'}
+            {hasPerson ? ` Calcolato su: ${[person.sesso ? (person.sesso === 'f' ? 'donna' : 'uomo') : '', person.eta ? person.eta + ' anni' : '', person.peso ? person.peso + ' kg' : '', person.altezza ? person.altezza + ' cm' : ''].filter(Boolean).join(', ')}.` : ''}
           </p>
+        )}
+        {!edit && !hasPerson && (
+          <Btn sm color="yellow" icon="270f" onClick={() => setEdit(true)}>
+            Inserisci i tuoi dati (peso, altezza...)
+          </Btn>
         )}
 
         {!key ? (
@@ -471,9 +434,17 @@ export default function DayAdvice({ compact = false }) {
                   <span className="mp-when">{m.pasto}</span>
                   <span className="mp-dish">{m.piatto}</span>
                   <span className="mp-ingr">{m.ingredienti.join(' · ')}</span>
+                  <button type="button" className={'chip mp-add' + (inMeals(m) ? ' on' : '')} disabled={inMeals(m)} onClick={() => toMeals([m])}>
+                    {inMeals(m) ? 'In Pasti' : '+ Pasti'}
+                  </button>
                 </li>
               ))}
             </ol>
+            {plan.pasti.some((m) => !inMeals(m)) && (
+              <Btn sm icon="1f4c5" onClick={() => toMeals(plan.pasti)}>
+                Metti tutto il menu in Pasti (oggi)
+              </Btn>
+            )}
             <div className="plan-tot">
               <Meter label="Proteine" value={plan.proteine_tot} />
               <Meter label="Verdure" value={plan.verdure_tot} />
@@ -481,6 +452,16 @@ export default function DayAdvice({ compact = false }) {
             </div>
             {plan.fabbisogno && <p className="small muted">{plan.fabbisogno}</p>}
             {plan.consiglio && <p className="small">{plan.consiglio}</p>}
+            {plan.regole?.length > 0 && (
+              <details className="plan-rules">
+                <summary className="small">Regole dei libri usate ({plan.regole.length})</summary>
+                <ul className="small">
+                  {plan.regole.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
             {plan.da_comprare?.length > 0 && (
               <div className="chips">
                 {plan.da_comprare.map((n) => (
@@ -505,10 +486,10 @@ export default function DayAdvice({ compact = false }) {
       </Box>
 
       {hasRules && key && (
-        <Box compact={compact} icon="1f9fe" title={diet ? 'Spesa della dieta' : 'Spesa secondo i libri'}>
+        <Box compact={compact} icon="1f9fe" title="Spesa secondo i libri">
           {!shop ? (
             <>
-              <p className="small muted">Cosa comprare per seguire {[diet?.name, ...guides.map((g) => g.name)].filter(Boolean).join(' e ')}, tolto quello che hai già.</p>
+              <p className="small muted">Cosa comprare per seguire {guides.map((g) => g.name).join(' e ')}, tolto quello che hai già.</p>
               <div className="row">
                 <select className="input pick grow" value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Per quanti giorni">
                   <option value={3}>Per 3 giorni</option>

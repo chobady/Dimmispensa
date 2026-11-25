@@ -739,7 +739,7 @@ body.no-scroll { overflow: hidden; }
 .meals-plan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .meals-plan li { display: grid; grid-template-columns: 78px minmax(0, 1fr); column-gap: 10px; row-gap: 1px; padding-bottom: 10px; border-bottom: 2px solid var(--paper-2); }
 .meals-plan li:last-child { border-bottom: 0; padding-bottom: 0; }
-.meals-plan .mp-when { grid-row: span 2; font-size: 15px; color: var(--ink-soft); padding-top: 1px; }
+.meals-plan .mp-when { grid-row: span 3; font-size: 15px; color: var(--ink-soft); padding-top: 1px; }
 .meals-plan .mp-dish { font-size: 18px; line-height: 1.15; }
 .meals-plan .mp-ingr { font-size: 15px; color: var(--ink-soft); line-height: 1.25; }
 .plan-tot { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -769,3 +769,6 @@ body.no-scroll { overflow: hidden; }
 .targets .guide-row { align-items: center; gap: 8px; }
 .targets .span2 { grid-column: 1 / -1; }
 .targets .field .chips { margin-top: 4px; }
+.meals-plan .mp-add { grid-column: 2; justify-self: start; margin-top: 6px; font-size: 14px; padding: 3px 10px; }
+.plan-rules summary { cursor: pointer; text-decoration: underline; }
+.plan-rules ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
