@@ -155,46 +155,45 @@ export default function Recipes() {
         </div>
       ) : (
         <>
-          <div className="row" style={{ marginBottom: 8 }}>
+          <div className="row recipe-top">
             <input className="input grow" type="search" placeholder="Cerca: pollo, torta, pasta..." value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cerca tra le ricette" />
             <Btn sm icon="1f4e6" onClick={() => fileRef.current?.click()} disabled={!!busy} aria-label="Importa altre ricette da Mela">Mela</Btn>
             <Btn sm icon="1f517" onClick={() => setWeb(true)} aria-label="Ricette dal web">Web</Btn>
           </div>
-          <label className="opt-check small" style={{ marginBottom: 8 }}>
-            <input type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} /> Importa solo le ricette nuove (più veloce)
-          </label>
           {busy && <p className="small center blink">{busy}</p>}
-          <div className="chips" style={{ marginBottom: 8 }}>
-            <button type="button" className={'chip ' + (filter === 'tutte' ? 'on' : '')} onClick={() => setFilter('tutte')}>Tutte ({recipes.length})</button>
-            <button type="button" className={'chip ' + (filter === 'ora' ? 'on' : '')} onClick={() => setFilter('ora')}>Posso farle ora ({nNow})</button>
-            <button type="button" className={'chip ' + (filter === 'scadenza' ? 'on' : '')} onClick={() => setFilter('scadenza')}>Usano cibi in scadenza ({nSoon})</button>
-            <button type="button" className={'chip ' + (filter === 'salvate' ? 'on' : '')} onClick={() => setFilter('salvate')}>★ Salvate ({nSaved})</button>
+          <div className="hscroll recipe-filters">
+            <button type="button" className={'chip ' + (filter === 'tutte' ? 'on' : '')} onClick={() => setFilter('tutte')}>Tutte <span className="n">{recipes.length}</span></button>
+            <button type="button" className={'chip ' + (filter === 'ora' ? 'on' : '')} onClick={() => setFilter('ora')}>Posso farle ora <span className="n">{nNow}</span></button>
+            <button type="button" className={'chip ' + (filter === 'scadenza' ? 'on' : '')} onClick={() => setFilter('scadenza')}>Usano cibi in scadenza <span className="n">{nSoon}</span></button>
+            <button type="button" className={'chip ' + (filter === 'salvate' ? 'on' : '')} onClick={() => setFilter('salvate')}>★ Salvate <span className="n">{nSaved}</span></button>
           </div>
-          {cats.length > 1 && (
+          <div className={'recipe-picks ' + (cats.length > 1 ? 'two-picks' : '')}>
+            {cats.length > 1 && (
+              <label className="pick-wrap">
+                <span className="sr-only">Libro o categoria</span>
+                <select className={'input pick ' + (cat ? 'on' : '')} value={cat} onChange={(e) => setCat(e.target.value)}>
+                  <option value="">Tutti i libri ({cats.length})</option>
+                  {cats.map(([c, n]) => (
+                    <option key={c} value={c}>
+                      {c} ({n})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label className="pick-wrap">
-              <span className="sr-only">Libro o categoria</span>
-              <select className={'input pick ' + (cat ? 'on' : '')} value={cat} onChange={(e) => setCat(e.target.value)}>
-                <option value="">Tutti i libri e le categorie ({cats.length})</option>
-                {cats.map(([c, n]) => (
-                  <option key={c} value={c}>
-                    {c} ({n})
+              <span className="sr-only">Ordina le ricette</span>
+              <select className="input pick" value={sort} onChange={(e) => pickSort(e.target.value)}>
+                {Object.entries(SORTS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v.label}
                   </option>
                 ))}
               </select>
             </label>
-          )}
+          </div>
           {cat && <RemoveBook cat={cat} ids={recipes.filter((r) => (r.categories || []).includes(cat)).map((r) => r.id)} onDone={() => setCat('')} />}
-          <label className="pick-wrap">
-            <span className="sr-only">Ordina le ricette</span>
-            <select className="input pick" value={sort} onChange={(e) => pickSort(e.target.value)}>
-              {Object.entries(SORTS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {shown.length > 0 && <p className="small muted" style={{ margin: '0 0 8px' }}>{shown.length === recipes.length ? `${shown.length} ricette` : `${shown.length} ricette su ${recipes.length}`}</p>}
+          {shown.length > 0 && <p className="small muted list-count">{shown.length === recipes.length ? `${shown.length} ricette` : `${shown.length} ricette su ${recipes.length}`}</p>}
           <div className="recipe-list">
             {shown.slice(0, limit).map(({ r, c }) => (
               <button key={r.id} type="button" className="win flat recipe-card" onClick={() => setOpenId(r.id)}>
@@ -221,6 +220,15 @@ export default function Recipes() {
             <Btn block style={{ marginTop: 12 }} onClick={() => setLimit(limit + 40)}>Mostra altre ({shown.length - limit})</Btn>
           )}
           {!shown.length && <p className="muted center" style={{ marginTop: 14 }}>{filter === 'salvate' && !nSaved ? 'Nessuna ricetta salvata: aprine una e tocca ☆ Salva per dopo.' : 'Nessuna ricetta corrisponde.'}</p>}
+          <details className="import-opts">
+            <summary className="small muted">Opzioni per importare da Mela</summary>
+            <label className="opt-check small">
+              <input type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} /> Solo le ricette nuove (più veloce)
+            </label>
+            <label className="opt-check small">
+              <input type="checkbox" checked={photos} onChange={(e) => setPhotos(e.target.checked)} /> Con le foto (una miniatura per ricetta)
+            </label>
+          </details>
         </>
       )}
 

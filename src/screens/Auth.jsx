@@ -65,7 +65,7 @@ export function Login({ error }) {
           <span>Password{mode === 'crea' ? ' (almeno 6 caratteri)' : ''}</span>
           <input className="input" type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete={mode === 'crea' ? 'new-password' : 'current-password'} required minLength={6} />
         </label>
-        {msg && <p className="win flat small" role="alert" style={{ background: msg.err ? '#ffd9d4' : '#d8f5c8' }}>{msg.text}</p>}
+        {msg && <p className="win flat small" role="alert" style={{ background: msg.err ? 'var(--red-t)' : 'var(--green-t)' }}>{msg.text}</p>}
         <Btn type="submit" color="green" block sound={null} disabled={busy}>{busy ? 'Un attimo...' : mode === 'crea' ? 'Crea account' : 'Entra'}</Btn>
         {mode === 'entra' && <Btn sm block onClick={reset}>Ho dimenticato la password</Btn>}
       </form>
@@ -99,7 +99,7 @@ export function PantryChoice({ user, error }) {
     <div className="splash">
       <Mascot mood="idle" size={70} />
       <h1 className="title center">Ciao {user?.name}! Quale dispensa usiamo?</h1>
-      {msg && <p className="win flat small" role="alert" style={{ background: '#ffd9d4' }}>{msg}</p>}
+      {msg && <p className="win flat small" role="alert" style={{ background: 'var(--red-t)' }}>{msg}</p>}
 
       <form className="win stack" onSubmit={(e) => (e.preventDefault(), run(() => actions.createPantry(name, importLocal)))}>
         <h2 className="title">Ne creo una nuova</h2>

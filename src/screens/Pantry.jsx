@@ -14,7 +14,6 @@ export const byExpiry = (a, b) => {
 };
 
 // posti piccoli, sotto le schede principali
-const MINI = ['spezie', 'casa'];
 
 export default function Pantry() {
   const { state, warnDays, openItem, go, goneIds } = useApp();
@@ -62,62 +61,42 @@ export default function Pantry() {
 
   return (
     <>
-      <Talk text={text} mood={mood} />
-      {(expired > 0 || soon > 0) && (
-        <Btn color="yellow" block icon="23f0" onClick={() => go('scadenze')}>Guarda cosa scade</Btn>
-      )}
+      <Talk text={text} mood={mood} action={expired > 0 || soon > 0 ? { label: 'Guarda cosa scade', fn: () => go('scadenze') } : null} />
 
-      <div className="seg tall" style={{ marginTop: 14 }} role="tablist" aria-label="Dove">
-        {[{ id: 'tutto', name: 'Tutto', icon: '1f3e0' }, ...LOCATIONS.filter((l) => !MINI.includes(l.id))].map((l) => (
-          <button
-            key={l.id}
-            type="button"
-            role="tab"
-            aria-selected={loc === l.id}
-            className={loc === l.id ? 'on' : ''}
-            onClick={() => {
-              play('tap');
-              setLoc(l.id);
-            }}
-          >
-            <span className="lbl">{l.name}</span>
-            <span className="n">{counts[l.id] || 0}</span>
-          </button>
-        ))}
-      </div>
-      <div className="mini-places" role="tablist" aria-label="Altri posti">
-        {LOCATIONS.filter((l) => MINI.includes(l.id)).map((l) => (
-          <button
-            key={l.id}
-            type="button"
-            role="tab"
-            aria-selected={loc === l.id}
-            className={'mini-place ' + (loc === l.id ? 'on' : '')}
-            onClick={() => {
-              play('tap');
-              setLoc(loc === l.id ? 'tutto' : l.id);
-            }}
-          >
-            <Icon id={l.icon} size={20} /> {l.id === 'casa' ? 'Casa e pulizia' : 'Spezie'} <span className="n">{counts[l.id] || 0}</span>
-          </button>
-        ))}
-      </div>
-
-      {items.length > 0 && loc !== 'casa' && (
-        <div className="chips macro-filter" role="group" aria-label="Macronutriente">
-          <button type="button" className={'chip ' + (macro === 'tutti' ? 'on' : '')} onClick={() => setMacro('tutti')}>Tutti</button>
-          {MACROS.map((m) => (
-            <button key={m.id} type="button" className={'chip ' + (macro === m.id ? 'on' : '')} aria-pressed={macro === m.id} onClick={() => setMacro(macro === m.id ? 'tutti' : m.id)}>
-              <span className={'macro m-' + m.id}>{m.short}</span> {m.name}
+      <div className="filters">
+        <div className="hscroll places" role="tablist" aria-label="Dove">
+          {[{ id: 'tutto', name: 'Tutto', icon: '1f3e0' }, ...LOCATIONS].map((l) => (
+            <button
+              key={l.id}
+              type="button"
+              role="tab"
+              aria-selected={loc === l.id}
+              className={'chip place ' + (loc === l.id ? 'on' : '')}
+              onClick={() => {
+                play('tap');
+                setLoc(loc === l.id && l.id !== 'tutto' ? 'tutto' : l.id);
+              }}
+            >
+              <Icon id={l.icon} size={18} />
+              {l.id === 'casa' ? 'Casa' : l.name} <span className="n">{counts[l.id] || 0}</span>
             </button>
           ))}
         </div>
-      )}
-      {items.length > 6 && (
-        <input className="input" style={{ marginTop: 10 }} type="search" placeholder="Cerca un cibo..." aria-label="Cerca un cibo" value={q} onChange={(e) => setQ(e.target.value)} />
-      )}
+        {items.length > 6 && (
+          <input className="input" type="search" placeholder="Cerca un cibo..." aria-label="Cerca un cibo" value={q} onChange={(e) => setQ(e.target.value)} />
+        )}
+        {items.length > 0 && loc !== 'casa' && (
+          <div className="hscroll macro-filter" role="group" aria-label="Macronutriente">
+            {MACROS.map((m) => (
+              <button key={m.id} type="button" className={'chip ' + (macro === m.id ? 'on' : '')} aria-pressed={macro === m.id} onClick={() => setMacro(macro === m.id ? 'tutti' : m.id)}>
+                <span className={'macro m-' + m.id}>{m.short}</span> {m.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
-      <div className="list" style={{ marginTop: 14 }}>
+      <div className="list">
         {shown.map((it) => (
           <ItemCard key={it.id} item={it} onOpen={openItem} gone={goneIds.has(it.id)} />
         ))}
@@ -132,7 +111,7 @@ export default function Pantry() {
       {items.length === 0 && (
         <div className="empty">
           <Icon id="1f6d2" size={60} />
-          <p style={{ marginBottom: 12 }}>La dispensa è vuota.</p>
+          <p>La dispensa è vuota.</p>
           <Btn color="green" icon="2795" onClick={() => go('aggiungi')}>Aggiungi il primo cibo</Btn>
         </div>
       )}

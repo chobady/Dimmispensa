@@ -1,7 +1,7 @@
 // Conti dei macronutrienti: per un cibo (per 100 g) e per un pasto o una giornata (porzioni pesate).
 import { PIECE_G } from '../catalog.js';
 
-export const MACRO_COLORS = { p: '#ff8a7a', c: '#f7d038', f: '#6fb7e8' };
+export const MACRO_COLORS = { p: '#f7a296', c: '#f5c63e', f: '#92c8ee' };
 export const MACRO_NAMES = { p: 'Proteine', c: 'Carboidrati', f: 'Grassi' };
 
 // Peso in grammi (o ml) di una porzione; null se non si può sapere

@@ -26,9 +26,9 @@ export function PixelPie({ parts, size = 96, res = 24, empty = false }) {
         const d = Math.sqrt(dx * dx + dy * dy);
         if (d > r + 0.35) continue;
         if (d > r - 1.1) {
-          g.fillStyle = '#2b2140'; // contorno
+          g.fillStyle = '#26213a'; // contorno
         } else if (!tot || empty) {
-          g.fillStyle = (x + y) % 2 ? '#dce8b0' : '#eef5d0';
+          g.fillStyle = (x + y) % 2 ? '#e2e7cf' : '#eff2e1';
         } else {
           let a = Math.atan2(dx, -dy) / (2 * Math.PI); // da mezzogiorno, in senso orario
           if (a < 0) a += 1;

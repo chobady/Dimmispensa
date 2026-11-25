@@ -559,7 +559,7 @@ function EntrySheet({ date, slot, entry, item, onClose, onRemove }) {
         )}
         {entry.done ? (
           <>
-            <p className="win flat small" style={{ background: '#d8f5c8' }}>Segnato come mangiato.</p>
+            <p className="win flat small" style={{ background: 'var(--green-t)' }}>Segnato come mangiato.</p>
             <Btn block onClick={() => (setDone(false), onClose())}>Non l'ho ancora mangiato</Btn>
           </>
         ) : (

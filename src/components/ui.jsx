@@ -41,7 +41,7 @@ export function Mascot({ mood = 'idle', size = 56 }) {
 }
 
 // Fumetto con testo che compare lettera per lettera, come nei giochi
-export function Talk({ text, mood = 'idle' }) {
+export function Talk({ text, mood = 'idle', action }) {
   const [n, setN] = useState(0);
   const reduce = useRef(typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches);
   useEffect(() => {
@@ -55,10 +55,18 @@ export function Talk({ text, mood = 'idle' }) {
   }, [text]);
   return (
     <div className="talk">
-      <Mascot mood={mood} />
-      <div className="win bubble" aria-live="polite" aria-label={text}>
+      <Mascot mood={mood} size={42} />
+      <div className="win bubble" aria-live="polite">
+        <span className="sr-only">{text}</span>
         <span aria-hidden="true">{text.slice(0, n)}</span>
-        {n < text.length && <span className="caret" />}
+        {n < text.length && <span className="caret" aria-hidden="true" />}
+        {action && (
+          <div>
+            <button type="button" className="go" onClick={action.fn}>
+              {action.label}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

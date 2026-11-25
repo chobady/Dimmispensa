@@ -140,7 +140,8 @@ export default function App() {
     <AppCtx.Provider value={ctx}>
       <div className="app">
         <header className="topbar">
-          <Icon id="1f9ca" size={20} />
+          <i className="lens" aria-hidden="true" />
+          <span className="lights" aria-hidden="true"><i /><i /><i /></span>
           <span className="logo">DIMMISPENSA</span>
           <span className="where" title={state.online ? 'Sincronizzato' : 'Non in linea: salvo appena torna la rete'}>
             <span>{state.pantry?.name}</span>
