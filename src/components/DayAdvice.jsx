@@ -59,7 +59,6 @@ const ESSENTIALS = [
 ];
 
 const LS_PLAN = 'dm_dayplan';
-const LS_TARGET = 'dm_targets';
 // la dieta resta SOLO su questo dispositivo (come i libri degli abbinamenti): non va su Firebase
 const LS_DIET = 'dm_diet';
 // libri di principi (linee guida generali): più d'uno, anche insieme alla dieta, sempre solo sul dispositivo
@@ -112,7 +111,6 @@ export default function DayAdvice({ compact = false }) {
   const items = state.items;
   const key = state.pantry?.geminiKey || '';
   const me = state.user?.name || '';
-  const [targets, setTargets] = useState(() => lsGet(LS_TARGET, { protein: 200, veg: 400 }));
   const [saved, setSaved] = useState(() => lsGet(LS_PLAN, null));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -137,8 +135,8 @@ export default function DayAdvice({ compact = false }) {
     setBusy(true);
     setErr('');
     try {
-      const p = await dayPlan(key, pantryText(items), targets, dietArg);
-      const next = { date: today, sig, targets, plan: p };
+      const p = await dayPlan(key, pantryText(items), dietArg);
+      const next = { date: today, sig, plan: p };
       lsSet(LS_PLAN, next);
       setSaved(next);
     } catch (e) {
@@ -196,22 +194,30 @@ export default function DayAdvice({ compact = false }) {
     }
     return text;
   };
-  const importGuide = async (file) => {
-    if (!file) return;
-    try {
-      const text = await readBook(file);
-      if (text.length > 400000) throw new Error('Il file è troppo grande (oltre 400 KB).');
-      const g = { name: file.name.replace(/\.(json|txt)$/i, '').replace(/[_-]+/g, ' '), text, size: text.length, importedAt: Date.now() };
-      const next = [...guides.filter((x) => x.name !== g.name), g];
-      if (!lsSet(LS_GUIDES, next)) throw new Error('Spazio finito sul dispositivo.');
-      setGuides(next);
-      setShop(null);
-      play('add');
-      toast(`Principi "${g.name}" aggiunti: menu e spesa ne terranno conto.`);
-      if (text.length > 70000) toast('Il file è lungo: a Gemini mando solo i primi 70.000 caratteri.', { err: true });
-    } catch (e) {
-      toast(e.message || 'Non riesco a leggere il file.', { err: true });
+  // si possono scegliere più file insieme
+  const importGuides = async (files) => {
+    const list = [...(files || [])];
+    if (!list.length) return;
+    let next = guides;
+    let added = 0;
+    for (const [n, file] of list.entries()) {
+      try {
+        const text = await readBook(file);
+        if (text.length > 400000) throw new Error(`${file.name}: troppo grande (oltre 400 KB).`);
+        const g = { name: file.name.replace(/\.(json|txt)$/i, '').replace(/[_-]+/g, ' '), text, size: text.length, importedAt: Date.now() + n };
+        next = [...next.filter((x) => x.name !== g.name), g];
+        if (text.length > 70000) toast(`${g.name}: è lungo, a Gemini mando solo i primi 70.000 caratteri.`, { err: true });
+        added++;
+      } catch (e) {
+        toast(e.message || `Non riesco a leggere ${file.name}.`, { err: true });
+      }
     }
+    if (!added) return;
+    if (!lsSet(LS_GUIDES, next)) return toast('Spazio finito sul dispositivo.', { err: true });
+    setGuides(next);
+    setShop(null);
+    play('add');
+    toast(added > 1 ? `${added} libri aggiunti: menu e spesa li seguiranno.` : 'Libro aggiunto: menu e spesa lo seguiranno.');
   };
   const dropGuide = (at) => {
     const next = guides.filter((g) => g.importedAt !== at);
@@ -280,33 +286,16 @@ export default function DayAdvice({ compact = false }) {
     setShop(null);
   };
 
-  const setT = (k, v) => {
-    const next = {
-      ...targets,
-      [k]: Math.max(0, Math.min(1000, Number(v) || 0)),
-    };
-    setTargets(next);
-    lsSet(LS_TARGET, next);
-  };
-
   return (
     <aside className={'day-advice' + (compact ? ' compact' : '')}>
       <Box compact={compact} icon="1f37d" title="Oggi da mangiare" hint={plan ? `${plan.pasti.length} pasti` : ''}>
         <div className="advice-tools">
           <button type="button" className="link-btn small" onClick={() => setEdit(!edit)}>
-            {edit ? 'Fatto' : 'Obiettivi e dieta'}
+            {edit ? 'Fatto' : 'Libri e dieta'}
           </button>
         </div>
         {edit ? (
           <div className="targets">
-            <label className="field">
-              <span>Proteine (g al giorno)</span>
-              <input className="input" type="number" inputMode="numeric" value={targets.protein} onChange={(e) => setT('protein', e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Verdure (g al giorno)</span>
-              <input className="input" type="number" inputMode="numeric" value={targets.veg} onChange={(e) => setT('veg', e.target.value)} />
-            </label>
             <div className="diet-ctl">
               <b className="small">Dieta da un libro</b>
               {diet ? (
@@ -338,8 +327,8 @@ export default function DayAdvice({ compact = false }) {
               <input ref={fileRef} type="file" accept=".json,.txt,application/json,text/plain" hidden onChange={(e) => (importDiet(e.target.files?.[0]), (e.target.value = ''))} />
             </div>
             <div className="diet-ctl">
-              <b className="small">Libri di principi</b>
-              <p className="small muted">Linee guida generali (non un menu giorno per giorno): puoi caricarne più d'uno, anche insieme alla dieta. Restano su questo dispositivo.</p>
+              <b className="small">I tuoi libri</b>
+              <p className="small muted">Il menu e la spesa seguono questi libri. Puoi sceglierne più di uno alla volta. Restano su questo dispositivo.</p>
               {guides.map((g) => (
                 <div className="row guide-row" key={g.importedAt}>
                   <span className="small grow">
@@ -351,9 +340,9 @@ export default function DayAdvice({ compact = false }) {
                 </div>
               ))}
               <Btn sm icon="1f4dd" onClick={() => guideRef.current?.click()}>
-                Aggiungi un libro di principi
+                Aggiungi file JSON (anche più di uno)
               </Btn>
-              <input ref={guideRef} type="file" accept=".json,.txt,application/json,text/plain" hidden onChange={(e) => (importGuide(e.target.files?.[0]), (e.target.value = ''))} />
+              <input ref={guideRef} type="file" accept=".json,.txt,application/json,text/plain" hidden multiple onChange={(e) => (importGuides(e.target.files), (e.target.value = ''))} />
             </div>
           </div>
         ) : (
@@ -365,10 +354,10 @@ export default function DayAdvice({ compact = false }) {
               </>
             ) : (
               <>
-                Obiettivo: {targets.protein} g di proteine e {targets.veg} g di verdure, pochi zuccheri e grassi.
+                {guides.length ? '' : 'Nessun libro caricato: uso le linee guida italiane. Caricali da "Libri e dieta".'}
               </>
             )}
-            {guides.length ? ` Principi: ${guides.map((g) => g.name).join(', ')}.` : ''}
+            {guides.length ? `Segue i tuoi libri: ${guides.map((g) => g.name).join(', ')}.` : ''}
           </p>
         )}
 
@@ -400,8 +389,8 @@ export default function DayAdvice({ compact = false }) {
               ))}
             </ol>
             <div className="plan-tot">
-              <Meter label="Proteine" value={plan.proteine_tot} target={targets.protein} />
-              <Meter label="Verdure" value={plan.verdure_tot} target={targets.veg} />
+              <Meter label="Proteine" value={plan.proteine_tot} />
+              <Meter label="Verdure" value={plan.verdure_tot} />
             </div>
             {plan.consiglio && <p className="small">{plan.consiglio}</p>}
             {plan.da_comprare?.length > 0 && (
@@ -428,7 +417,7 @@ export default function DayAdvice({ compact = false }) {
       </Box>
 
       {hasRules && key && (
-        <Box compact={compact} icon="1f9fe" title={diet ? 'Spesa della dieta' : 'Spesa secondo i principi'}>
+        <Box compact={compact} icon="1f9fe" title={diet ? 'Spesa della dieta' : 'Spesa secondo i libri'}>
           {!shop ? (
             <>
               <p className="small muted">Cosa comprare per seguire {[diet?.name, ...guides.map((g) => g.name)].filter(Boolean).join(' e ')}, tolto quello che hai già.</p>
@@ -498,21 +487,12 @@ export default function DayAdvice({ compact = false }) {
   );
 }
 
-function Meter({ label, value, target }) {
-  const v = Math.round(Number(value) || 0);
-  const r = target ? Math.min(1, v / target) : 0;
+// stima della giornata (gli obiettivi ora vengono dai libri)
+function Meter({ label, value }) {
   return (
     <div className="meter">
       <span className="small">
-        {label} <b>{v} g</b> <span className="muted">/ {target}</span>
-      </span>
-      <span className="have-bar" aria-hidden="true">
-        <span
-          style={{
-            width: Math.round(r * 100) + '%',
-            background: r >= 0.9 ? 'var(--green)' : 'var(--yellow)',
-          }}
-        />
+        {label} <b>{Math.round(Number(value) || 0)} g</b> <span className="muted">stimati</span>
       </span>
     </div>
   );

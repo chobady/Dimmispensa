@@ -391,7 +391,7 @@ const DAY_SCHEMA = {
   },
   required: ['pasti', 'proteine_tot', 'verdure_tot', 'consiglio', 'da_comprare'],
 };
-// pantry: righe di testo già pronte; targets: { protein, veg } in grammi
+// pantry: righe di testo già pronte
 // diet: testo del file di una dieta (da un libro), tenuto solo sul dispositivo; può mancare
 const WEEKDAYS = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
 const dietBlock = (diet) => {
@@ -400,7 +400,7 @@ const dietBlock = (diet) => {
   if (diet.text)
     out += `
 
-DIETA DA SEGUIRE (dal libro dell'utente, in JSON o testo: interpretala tu). Ha la precedenza sugli obiettivi qui sopra quando sono in conflitto: rispetta cibi permessi e vietati, porzioni, abbinamenti e fasi. Se è divisa in giorni o settimane, oggi è ${WEEKDAYS[new Date().getDay()]}${diet.day ? ` e l'utente è al giorno ${diet.day} della dieta` : ''}: usa il giorno corrispondente.
+DIETA DA SEGUIRE (dal libro dell'utente, in JSON o testo: interpretala tu). Rispetta cibi permessi e vietati, porzioni, abbinamenti e fasi. Se è divisa in giorni o settimane, oggi è ${WEEKDAYS[new Date().getDay()]}${diet.day ? ` e l'utente è al giorno ${diet.day} della dieta` : ''}: usa il giorno corrispondente.
 """
 ${String(diet.text).slice(0, 60000)}
 """`;
@@ -408,25 +408,27 @@ ${String(diet.text).slice(0, 60000)}
   (diet.guides || []).forEach((g) => {
     out += `
 
-PRINCIPI DA SEGUIRE dal libro "${g.name}" (scelti dall'utente): usali per scegliere cibi, quantità, abbinamenti e cosa comprare. Se contraddicono gli obiettivi qui sopra, segui gli obiettivi e spiega la differenza nel consiglio. Le parti su malattie valgono solo se l'utente ne soffre.
+PRINCIPI DA SEGUIRE dal libro "${g.name}" (scelti dall'utente): usali per scegliere cibi, quantità, abbinamenti e cosa comprare. Se due libri si contraddicono, scegli l'indicazione più prudente e dillo in breve nel consiglio. Le parti su malattie valgono solo se l'utente ne soffre.
 """
 ${String(g.text).slice(0, 70000)}
 """`;
   });
   return out;
 };
-export async function dayPlan(key, pantry, targets, diet = null) {
+export async function dayPlan(key, pantry, diet = null) {
+  const books = diet && (diet.text || diet.guides?.length);
   const prompt = `Sei un nutrizionista pratico. Proponi cosa mangiare OGGI usando soprattutto quello che c'è in casa.
-Obiettivi della giornata:
-- circa ${targets.protein} g di PROTEINE (il nutriente, non il peso del cibo): tante proteine magre (carne bianca, pesce, uova, latticini magri, legumi, tofu);
-- circa ${targets.veg} g di VERDURE (peso della verdura): tante fibre;
-- pochi zuccheri e pochi grassi: niente dolci, fritti o condimenti abbondanti; olio misurato.
+${
+  books
+    ? `Segui i libri dell'utente qui sotto: da lì prendi calorie, quantità di proteine, carboidrati, grassi, verdure e frutta, porzioni, cibi da preferire e da limitare. Non inventare obiettivi diversi da quelli dei libri.`
+    : `Segui una dieta mediterranea equilibrata secondo le linee guida italiane: verdura e frutta abbondanti, cereali integrali, legumi, pesce, olio extravergine misurato, pochi zuccheri, sale e grassi saturi.`
+}
 Regole:
 - Usa prima i cibi che scadono presto. Porzioni realistiche per una persona, in grammi.
-- 3 pasti principali più 1-2 spuntini se servono a raggiungere le proteine.
-- "ingredienti": righe brevi con quantità, es. "Petto di pollo 200 g". Indica con "(da comprare)" quello che non c'è in casa.
-- "proteine_g" e "verdure_g": stime per quel pasto; "proteine_tot" e "verdure_tot": somme della giornata.
-- "consiglio": una o due frasi pratiche (es. cosa preparare in anticipo, o cosa manca per arrivare all'obiettivo).
+- 3 pasti principali più gli spuntini che servono.
+- "ingredienti": righe brevi con quantità, es. "Petto di pollo 150 g". Indica con "(da comprare)" quello che non c'è in casa.
+- "proteine_g" e "verdure_g": stime per quel pasto (grammi di proteine come nutriente, grammi di verdura come peso); "proteine_tot" e "verdure_tot": somme della giornata.
+- "consiglio": una o due frasi pratiche (es. cosa preparare in anticipo, o quale principio dei libri hai seguito).
 - "da_comprare": solo le cose che mancano per questo menu, nomi brevi in italiano.
 Rispondi in italiano, solo JSON.${dietBlock(diet)}
 
