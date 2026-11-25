@@ -365,3 +365,51 @@ Testo della pagina:
     cookTime: String(j.cottura || '').trim(),
   };
 }
+
+// ---- Consiglio del giorno: cosa mangiare oggi con quello che c'è in casa ----
+const DAY_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    pasti: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          pasto: { type: 'STRING', enum: ['Colazione', 'Spuntino', 'Pranzo', 'Merenda', 'Cena'] },
+          piatto: { type: 'STRING' },
+          ingredienti: { type: 'ARRAY', items: { type: 'STRING' } },
+          proteine_g: { type: 'NUMBER' },
+          verdure_g: { type: 'NUMBER' },
+        },
+        required: ['pasto', 'piatto', 'ingredienti', 'proteine_g', 'verdure_g'],
+      },
+    },
+    proteine_tot: { type: 'NUMBER' },
+    verdure_tot: { type: 'NUMBER' },
+    consiglio: { type: 'STRING' },
+    da_comprare: { type: 'ARRAY', items: { type: 'STRING' } },
+  },
+  required: ['pasti', 'proteine_tot', 'verdure_tot', 'consiglio', 'da_comprare'],
+};
+// pantry: righe di testo già pronte; targets: { protein, veg } in grammi
+export async function dayPlan(key, pantry, targets) {
+  const prompt = `Sei un nutrizionista pratico. Proponi cosa mangiare OGGI usando soprattutto quello che c'è in casa.
+Obiettivi della giornata:
+- circa ${targets.protein} g di PROTEINE (il nutriente, non il peso del cibo): tante proteine magre (carne bianca, pesce, uova, latticini magri, legumi, tofu);
+- circa ${targets.veg} g di VERDURE (peso della verdura): tante fibre;
+- pochi zuccheri e pochi grassi: niente dolci, fritti o condimenti abbondanti; olio misurato.
+Regole:
+- Usa prima i cibi che scadono presto. Porzioni realistiche per una persona, in grammi.
+- 3 pasti principali più 1-2 spuntini se servono a raggiungere le proteine.
+- "ingredienti": righe brevi con quantità, es. "Petto di pollo 200 g". Indica con "(da comprare)" quello che non c'è in casa.
+- "proteine_g" e "verdure_g": stime per quel pasto; "proteine_tot" e "verdure_tot": somme della giornata.
+- "consiglio": una o due frasi pratiche (es. cosa preparare in anticipo, o cosa manca per arrivare all'obiettivo).
+- "da_comprare": solo le cose che mancano per questo menu, nomi brevi in italiano.
+Rispondi in italiano, solo JSON.
+
+In casa c'è:
+${pantry || '(niente)'}`;
+  const j = parseJSON(await generate(key, [{ text: prompt }], DAY_SCHEMA));
+  if (!j || !Array.isArray(j.pasti) || !j.pasti.length) throw new GeminiError('Gemini non ha proposto un menu. Riprova.', 'parse');
+  return j;
+}
