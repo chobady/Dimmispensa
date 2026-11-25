@@ -392,7 +392,18 @@ const DAY_SCHEMA = {
   required: ['pasti', 'proteine_tot', 'verdure_tot', 'consiglio', 'da_comprare'],
 };
 // pantry: righe di testo già pronte; targets: { protein, veg } in grammi
-export async function dayPlan(key, pantry, targets) {
+// diet: testo del file di una dieta (da un libro), tenuto solo sul dispositivo; può mancare
+const WEEKDAYS = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+const dietBlock = (diet) =>
+  diet
+    ? `
+
+DIETA DA SEGUIRE (dal libro dell'utente, in JSON o testo: interpretala tu). Ha la precedenza sugli obiettivi qui sopra quando sono in conflitto: rispetta cibi permessi e vietati, porzioni, abbinamenti e fasi. Se è divisa in giorni o settimane, oggi è ${WEEKDAYS[new Date().getDay()]}${diet.day ? ` e l'utente è al giorno ${diet.day} della dieta` : ''}: usa il giorno corrispondente.
+"""
+${String(diet.text).slice(0, 60000)}
+"""`
+    : '';
+export async function dayPlan(key, pantry, targets, diet = null) {
   const prompt = `Sei un nutrizionista pratico. Proponi cosa mangiare OGGI usando soprattutto quello che c'è in casa.
 Obiettivi della giornata:
 - circa ${targets.protein} g di PROTEINE (il nutriente, non il peso del cibo): tante proteine magre (carne bianca, pesce, uova, latticini magri, legumi, tofu);
@@ -405,11 +416,47 @@ Regole:
 - "proteine_g" e "verdure_g": stime per quel pasto; "proteine_tot" e "verdure_tot": somme della giornata.
 - "consiglio": una o due frasi pratiche (es. cosa preparare in anticipo, o cosa manca per arrivare all'obiettivo).
 - "da_comprare": solo le cose che mancano per questo menu, nomi brevi in italiano.
-Rispondi in italiano, solo JSON.
+Rispondi in italiano, solo JSON.${dietBlock(diet)}
 
 In casa c'è:
 ${pantry || '(niente)'}`;
   const j = parseJSON(await generate(key, [{ text: prompt }], DAY_SCHEMA));
   if (!j || !Array.isArray(j.pasti) || !j.pasti.length) throw new GeminiError('Gemini non ha proposto un menu. Riprova.', 'parse');
+  return j;
+}
+
+// ---- Spesa secondo la dieta: cosa comprare per i prossimi giorni ----
+const SHOP_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    spesa: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          nome: { type: 'STRING' },
+          quantita: { type: 'NUMBER' },
+          unita: { type: 'STRING', enum: ['pz', 'conf', 'g', 'kg', 'ml', 'l'] },
+          perche: { type: 'STRING' },
+        },
+        required: ['nome', 'quantita', 'unita'],
+      },
+    },
+    nota: { type: 'STRING' },
+  },
+  required: ['spesa'],
+};
+export async function dietShopping(key, pantry, diet, days = 7) {
+  const prompt = `Prepara la lista della spesa per i prossimi ${days} giorni seguendo questa dieta, per una persona.
+- Togli quello che c'è già in casa in quantità sufficiente (sotto c'è la dispensa).
+- Quantità realistiche da supermercato italiano (es. 500 g, 1 kg, 6 pz, 1 conf). Raggruppa (un solo "Petto di pollo 1 kg", non sette righe).
+- "nome": breve, in italiano, senza marca. "perche": a cosa serve, in poche parole (es. "pranzi di lun-mer").
+- "nota": una frase su come organizzarsi (facoltativa).
+Rispondi solo JSON.${dietBlock(diet)}
+
+In casa c'è:
+${pantry || '(niente)'}`;
+  const j = parseJSON(await generate(key, [{ text: prompt }], SHOP_SCHEMA));
+  if (!j || !Array.isArray(j.spesa)) throw new GeminiError('Gemini non ha preparato la lista. Riprova.', 'parse');
   return j;
 }

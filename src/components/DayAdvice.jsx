@@ -1,65 +1,72 @@
 // Accanto alla dispensa: cosa mangiare oggi (Gemini, molte proteine e verdure, pochi zuccheri e grassi)
 // e cosa manca in casa (controllo fisso delle cose essenziali, senza Gemini).
-import { useEffect, useMemo, useState } from "react";
-import { BY_KEY, isCasa } from "../catalog.js";
-import { actions } from "../lib/store.js";
-import { daysLeft, todayISO } from "../lib/dates.js";
-import { newId, qtyLabel } from "../lib/items.js";
-import { dayPlan } from "../lib/gemini.js";
-import { play } from "../lib/sound.js";
-import { Btn, Icon, useApp } from "./ui.jsx";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { BY_KEY, isCasa, matchFood } from '../catalog.js';
+import { actions } from '../lib/store.js';
+import { daysLeft, todayISO } from '../lib/dates.js';
+import { newId, qtyLabel } from '../lib/items.js';
+import { dayPlan, dietShopping } from '../lib/gemini.js';
+import { play } from '../lib/sound.js';
+import { Btn, Icon, useApp } from './ui.jsx';
 
 // Cose che in una casa di solito non mancano. Ognuna è "presente" se c'è almeno un cibo con una di quelle chiavi
 // (o di quella categoria). La chiave in "add" è quella che finisce nella lista della spesa.
 const ESSENTIALS = [
-  { name: "Sale", keys: ["sale"] },
-  { name: "Olio", keys: ["olio"] },
+  { name: 'Sale', keys: ['sale'] },
+  { name: 'Olio', keys: ['olio'] },
   {
-    name: "Pepe o spezie",
-    keys: ["pepe", "spezie", "erbesecche"],
-    add: "pepe",
+    name: 'Pepe o spezie',
+    keys: ['pepe', 'spezie', 'erbesecche'],
+    add: 'pepe',
   },
-  { name: "Aceto", keys: ["aceto"] },
-  { name: "Aglio", keys: ["aglio"] },
-  { name: "Cipolle", keys: ["cipolla"], add: "cipolla" },
-  { name: "Frutta", cats: ["frutta"], add: "mela" },
-  { name: "Verdura", cats: ["verdura"], add: "insalata" },
-  { name: "Uova", keys: ["uova"] },
+  { name: 'Aceto', keys: ['aceto'] },
+  { name: 'Aglio', keys: ['aglio'] },
+  { name: 'Cipolle', keys: ['cipolla'], add: 'cipolla' },
+  { name: 'Frutta', cats: ['frutta'], add: 'mela' },
+  { name: 'Verdura', cats: ['verdura'], add: 'insalata' },
+  { name: 'Uova', keys: ['uova'] },
   {
-    name: "Latte o yogurt",
-    keys: ["latte", "yogurt", "lattevegetale"],
-    add: "latte",
+    name: 'Latte o yogurt',
+    keys: ['latte', 'yogurt', 'lattevegetale'],
+    add: 'latte',
   },
-  { name: "Carne o pesce", cats: ["carne", "pesce"], add: "petto" },
+  { name: 'Carne o pesce', cats: ['carne', 'pesce'], add: 'petto' },
   {
-    name: "Legumi",
-    keys: ["legumi", "ceci", "lenticchie", "fagioli", "piselli", "edamame"],
-    add: "legumi",
+    name: 'Legumi',
+    keys: ['legumi', 'ceci', 'lenticchie', 'fagioli', 'piselli', 'edamame'],
+    add: 'legumi',
   },
-  { name: "Tonno in scatola", keys: ["tonno"] },
-  { name: "Pasta", keys: ["pasta"] },
-  { name: "Riso", keys: ["riso"] },
+  { name: 'Tonno in scatola', keys: ['tonno'] },
+  { name: 'Pasta', keys: ['pasta'] },
+  { name: 'Riso', keys: ['riso'] },
   {
-    name: "Pane o cracker",
-    keys: ["pane", "cracker", "gallette"],
-    add: "pane",
+    name: 'Pane o cracker',
+    keys: ['pane', 'cracker', 'gallette'],
+    add: 'pane',
   },
-  { name: "Passata o pelati", keys: ["passata", "pelati"], add: "passata" },
-  { name: "Farina", keys: ["farina"] },
-  { name: "Zucchero", keys: ["zucchero"] },
-  { name: "Caffè", keys: ["caffe"] },
+  { name: 'Passata o pelati', keys: ['passata', 'pelati'], add: 'passata' },
+  { name: 'Farina', keys: ['farina'] },
+  { name: 'Zucchero', keys: ['zucchero'] },
+  { name: 'Caffè', keys: ['caffe'] },
   {
-    name: "Detersivo piatti",
-    keys: ["detersivopiatti", "pastiglielavastoviglie"],
-    add: "detersivopiatti",
+    name: 'Detersivo piatti',
+    keys: ['detersivopiatti', 'pastiglielavastoviglie'],
+    add: 'detersivopiatti',
   },
-  { name: "Carta igienica", keys: ["cartaigienica"] },
-  { name: "Sapone", keys: ["sapone"] },
-  { name: "Detersivo lavatrice", keys: ["detersivolavatrice"] },
+  { name: 'Carta igienica', keys: ['cartaigienica'] },
+  { name: 'Sapone', keys: ['sapone'] },
+  { name: 'Detersivo lavatrice', keys: ['detersivolavatrice'] },
 ];
 
-const LS_PLAN = "dm_dayplan";
-const LS_TARGET = "dm_targets";
+const LS_PLAN = 'dm_dayplan';
+const LS_TARGET = 'dm_targets';
+// la dieta resta SOLO su questo dispositivo (come i libri degli abbinamenti): non va su Firebase
+const LS_DIET = 'dm_diet';
+const dayOfDiet = (diet) => {
+  if (!diet?.start) return 0;
+  const d = Math.floor((Date.parse(todayISO()) - Date.parse(diet.start)) / 86400000) + 1;
+  return d > 0 ? d : 0;
+};
 const lsGet = (k, d) => {
   try {
     return JSON.parse(localStorage.getItem(k)) ?? d;
@@ -70,7 +77,10 @@ const lsGet = (k, d) => {
 const lsSet = (k, v) => {
   try {
     localStorage.setItem(k, JSON.stringify(v));
-  } catch {}
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 // la dispensa in righe per Gemini (solo cibo), prima quello che scade
@@ -82,59 +92,52 @@ function pantryText(items) {
     .slice(0, 120)
     .map(({ i, d }) => {
       const n = i.nutr;
-      const per =
-        n && (n.p != null || n.c != null)
-          ? ` · per 100 g: proteine ${n.p ?? "?"} g, carboidrati ${n.c ?? "?"} g, grassi ${n.f ?? "?"} g`
-          : "";
-      const when =
-        d == null
-          ? ""
-          : d < 0
-            ? " · scaduto"
-            : d === 0
-              ? " · scade oggi"
-              : d <= 7
-                ? ` · scade tra ${d} giorni`
-                : "";
-      return `- ${i.name}${i.brand ? " (" + i.brand + ")" : ""} · ${qtyLabel(i)} · ${i.loc}${when}${per}`;
+      const per = n && (n.p != null || n.c != null) ? ` · per 100 g: proteine ${n.p ?? '?'} g, carboidrati ${n.c ?? '?'} g, grassi ${n.f ?? '?'} g` : '';
+      const when = d == null ? '' : d < 0 ? ' · scaduto' : d === 0 ? ' · scade oggi' : d <= 7 ? ` · scade tra ${d} giorni` : '';
+      return `- ${i.name}${i.brand ? ' (' + i.brand + ')' : ''} · ${qtyLabel(i)} · ${i.loc}${when}${per}`;
     })
-    .join("\n");
+    .join('\n');
 }
 const sigOf = (items) =>
   items
     .filter((i) => !isCasa(i))
-    .map((i) => i.id + ":" + i.qty)
+    .map((i) => i.id + ':' + i.qty)
     .sort()
-    .join(",");
+    .join(',');
 
 export default function DayAdvice() {
   const { state, go, toast } = useApp();
   const items = state.items;
-  const key = state.pantry?.geminiKey || "";
-  const me = state.user?.name || "";
-  const [targets, setTargets] = useState(() =>
-    lsGet(LS_TARGET, { protein: 200, veg: 400 }),
-  );
+  const key = state.pantry?.geminiKey || '';
+  const me = state.user?.name || '';
+  const [targets, setTargets] = useState(() => lsGet(LS_TARGET, { protein: 200, veg: 400 }));
   const [saved, setSaved] = useState(() => lsGet(LS_PLAN, null));
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
+  const [err, setErr] = useState('');
   const [edit, setEdit] = useState(false);
+  const [diet, setDiet] = useState(() => lsGet(LS_DIET, null));
+  const dietArg = diet ? { text: diet.text, day: dayOfDiet(diet) } : null;
+  const fileRef = useRef(null);
+  const [shop, setShop] = useState(null); // { spesa, nota } della dieta
+  const [shopBusy, setShopBusy] = useState(false);
+  const [pick, setPick] = useState({});
+  const [days, setDays] = useState(7);
   const today = todayISO();
   const plan = saved && saved.date === today ? saved.plan : null;
-  const sig = useMemo(() => sigOf(items), [items]);
+  const sig = useMemo(() => sigOf(items) + '|' + (diet ? diet.importedAt + ':' + (diet.start || '') : ''), [items, diet]);
   const stale = plan && saved.sig !== sig;
 
   const run = async () => {
     if (!key || busy) return;
     setBusy(true);
-    setErr("");
+    setErr('');
     try {
-      const p = await dayPlan(key, pantryText(items), targets);
+      const p = await dayPlan(key, pantryText(items), targets, dietArg);
       const next = { date: today, sig, targets, plan: p };
       lsSet(LS_PLAN, next);
       setSaved(next);
     } catch (e) {
-      setErr(e.message || "Gemini non risponde.");
+      setErr(e.message || 'Gemini non risponde.');
     } finally {
       setBusy(false);
     }
@@ -152,42 +155,97 @@ export default function DayAdvice() {
       if (Number(i.qty) === 0) return;
       keys.add(i.food);
       const f = BY_KEY[i.food];
-      if (f)
-        cats.add(f.cat + (["aglio", "cipolla"].includes(f.key) ? "-base" : ""));
+      if (f) cats.add(f.cat + (['aglio', 'cipolla'].includes(f.key) ? '-base' : ''));
     });
     return { keys, cats };
   }, [items]);
-  const inList = (name, food) =>
-    Object.values(state.shopping || {}).some(
-      (s) =>
-        !s.done &&
-        ((food && s.food === food) ||
-          s.name.toLowerCase() === name.toLowerCase()),
-    );
-  const missing = ESSENTIALS.filter(
-    (e) =>
-      !(e.keys || []).some((k) => have.keys.has(k)) &&
-      !(e.cats || []).some((c) => have.cats.has(c)),
-  );
+  const inList = (name, food) => Object.values(state.shopping || {}).some((s) => !s.done && ((food && s.food === food) || s.name.toLowerCase() === name.toLowerCase()));
+  const missing = ESSENTIALS.filter((e) => !(e.keys || []).some((k) => have.keys.has(k)) && !(e.cats || []).some((c) => have.cats.has(c)));
 
   const addShop = (name, foodKey) => {
     const f = foodKey ? BY_KEY[foodKey] : null;
-    if (inList(name, f?.key)) return toast("È già nella lista della spesa.");
+    if (inList(name, f?.key)) return toast('È già nella lista della spesa.');
     const id = newId();
     actions.shopSet(id, {
       id,
       name: f && !/ o /.test(name) ? f.name : name,
       qty: null,
       unit: null,
-      food: f ? f.key : "altro",
-      icon: f ? f.icon : "1f4e6",
-      cat: f ? f.cat : "dispensa",
+      food: f ? f.key : 'altro',
+      icon: f ? f.icon : '1f4e6',
+      cat: f ? f.cat : 'dispensa',
       done: false,
       by: me,
       addedAt: Date.now(),
     });
-    play("add");
+    play('add');
     toast(`${name}: aggiunto alla spesa.`);
+  };
+
+  const importDiet = async (file) => {
+    if (!file) return;
+    try {
+      let text = await file.text();
+      try {
+        text = JSON.stringify(JSON.parse(text)); // JSON compatto: meno spazio e meno quota di Gemini
+      } catch {
+        /* non è JSON: va bene anche il testo */
+      }
+      if (text.length > 400000) throw new Error('Il file è troppo grande (oltre 400 KB): tieni solo la parte della dieta che segui.');
+      const d = { name: file.name.replace(/\.(json|txt)$/i, ''), text, size: text.length, importedAt: Date.now(), start: todayISO() };
+      if (!lsSet(LS_DIET, d)) throw new Error('Spazio finito sul dispositivo.');
+      setDiet(d);
+      setShop(null);
+      play('add');
+      toast(`Dieta "${d.name}" caricata: da ora il menu la segue.`);
+      if (text.length > 60000) toast('Il file è lungo: a Gemini mando solo i primi 60.000 caratteri.', { err: true });
+    } catch (e) {
+      toast(e.message || 'Non riesco a leggere il file.', { err: true });
+    }
+  };
+  const setDiet2 = (d) => {
+    if (d) lsSet(LS_DIET, d);
+    else localStorage.removeItem(LS_DIET);
+    setDiet(d);
+  };
+  const runShop = async () => {
+    if (!key || !diet || shopBusy) return;
+    setShopBusy(true);
+    try {
+      const r = await dietShopping(key, pantryText(items), dietArg, days);
+      setShop(r);
+      setPick(Object.fromEntries(r.spesa.map((x, i) => [i, true])));
+    } catch (e) {
+      toast(e.message || 'Gemini non risponde.', { err: true });
+    } finally {
+      setShopBusy(false);
+    }
+  };
+  const addShopList = () => {
+    const now = Date.now();
+    let n = 0;
+    shop.spesa.forEach((x, i) => {
+      if (!pick[i] || inList(x.nome, null)) return;
+      const f = matchFood(x.nome);
+      const id = newId();
+      actions.shopSet(id, {
+        id,
+        name: x.nome,
+        qty: Number(x.quantita) || null,
+        unit: Number(x.quantita) ? x.unita : null,
+        food: f && f.cat !== 'casa' ? f.key : 'altro',
+        icon: f ? f.icon : '1f4e6',
+        cat: f ? f.cat : 'dispensa',
+        done: false,
+        by: me,
+        addedAt: now + i,
+        note: 'Dieta',
+      });
+      n++;
+    });
+    play('add');
+    toast(n ? `${n} cose aggiunte alla spesa.` : 'Erano già tutte nella lista.');
+    setShop(null);
   };
 
   const setT = (k, v) => {
@@ -205,51 +263,70 @@ export default function DayAdvice() {
         <div className="advice-head">
           <Icon id="1f37d" size={20} />
           <h2 className="title grow">Oggi da mangiare</h2>
-          <button
-            type="button"
-            className="link-btn small"
-            onClick={() => setEdit(!edit)}
-          >
-            {edit ? "Fatto" : "Obiettivi"}
+          <button type="button" className="link-btn small" onClick={() => setEdit(!edit)}>
+            {edit ? 'Fatto' : 'Obiettivi'}
           </button>
         </div>
         {edit ? (
           <div className="targets">
             <label className="field">
               <span>Proteine (g al giorno)</span>
-              <input
-                className="input"
-                type="number"
-                inputMode="numeric"
-                value={targets.protein}
-                onChange={(e) => setT("protein", e.target.value)}
-              />
+              <input className="input" type="number" inputMode="numeric" value={targets.protein} onChange={(e) => setT('protein', e.target.value)} />
             </label>
             <label className="field">
               <span>Verdure (g al giorno)</span>
-              <input
-                className="input"
-                type="number"
-                inputMode="numeric"
-                value={targets.veg}
-                onChange={(e) => setT("veg", e.target.value)}
-              />
+              <input className="input" type="number" inputMode="numeric" value={targets.veg} onChange={(e) => setT('veg', e.target.value)} />
             </label>
+            <div className="diet-ctl">
+              <b className="small">Dieta da un libro</b>
+              {diet ? (
+                <>
+                  <p className="small">
+                    {diet.name} <span className="muted">· {Math.round(diet.size / 1000)} KB, solo su questo dispositivo</span>
+                  </p>
+                  <label className="field">
+                    <span>Ho iniziato il (per contare i giorni della dieta)</span>
+                    <input className="input" type="date" value={diet.start || ''} onChange={(e) => setDiet2({ ...diet, start: e.target.value })} />
+                  </label>
+                  <div className="row">
+                    <Btn sm onClick={() => fileRef.current?.click()}>
+                      Sostituisci
+                    </Btn>
+                    <Btn sm color="red" onClick={() => setDiet2(null)}>
+                      Togli la dieta
+                    </Btn>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="small muted">Carica il file JSON (o di testo) con la dieta: il menu del giorno e la spesa la seguiranno. Il file resta su questo dispositivo.</p>
+                  <Btn sm icon="1f4e6" onClick={() => fileRef.current?.click()}>
+                    Carica il file della dieta
+                  </Btn>
+                </>
+              )}
+              <input ref={fileRef} type="file" accept=".json,.txt,application/json,text/plain" hidden onChange={(e) => (importDiet(e.target.files?.[0]), (e.target.value = ''))} />
+            </div>
           </div>
         ) : (
           <p className="small muted">
-            Obiettivo: {targets.protein} g di proteine e {targets.veg} g di
-            verdure, pochi zuccheri e grassi.
+            {diet ? (
+              <>
+                Segue la dieta <b>{diet.name}</b>
+                {dayOfDiet(diet) ? `, giorno ${dayOfDiet(diet)}` : ''}.
+              </>
+            ) : (
+              <>
+                Obiettivo: {targets.protein} g di proteine e {targets.veg} g di verdure, pochi zuccheri e grassi.
+              </>
+            )}
           </p>
         )}
 
         {!key ? (
           <p className="small">
-            Per il menu del giorno serve Gemini.{" "}
-            <a
-              href="#opzioni"
-              onClick={(e) => (e.preventDefault(), go("opzioni"))}
-            >
+            Per il menu del giorno serve Gemini.{' '}
+            <a href="#opzioni" onClick={(e) => (e.preventDefault(), go('opzioni'))}>
               Aggiungi la chiave
             </a>
           </p>
@@ -269,45 +346,28 @@ export default function DayAdvice() {
                 <li key={i}>
                   <span className="mp-when">{m.pasto}</span>
                   <span className="mp-dish">{m.piatto}</span>
-                  <span className="mp-ingr">{m.ingredienti.join(" · ")}</span>
+                  <span className="mp-ingr">{m.ingredienti.join(' · ')}</span>
                 </li>
               ))}
             </ol>
             <div className="plan-tot">
-              <Meter
-                label="Proteine"
-                value={plan.proteine_tot}
-                target={targets.protein}
-              />
-              <Meter
-                label="Verdure"
-                value={plan.verdure_tot}
-                target={targets.veg}
-              />
+              <Meter label="Proteine" value={plan.proteine_tot} target={targets.protein} />
+              <Meter label="Verdure" value={plan.verdure_tot} target={targets.veg} />
             </div>
             {plan.consiglio && <p className="small">{plan.consiglio}</p>}
             {plan.da_comprare?.length > 0 && (
               <div className="chips">
                 {plan.da_comprare.map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    className="chip"
-                    onClick={() => addShop(n, null)}
-                  >
+                  <button key={n} type="button" className="chip" onClick={() => addShop(n, null)}>
                     + {n}
                   </button>
                 ))}
               </div>
             )}
             <div className="row plan-foot">
-              <span className="small muted grow">
-                {stale
-                  ? "La dispensa è cambiata da stamattina."
-                  : "Preparato oggi con quello che hai."}
-              </span>
+              <span className="small muted grow">{stale ? 'La dispensa o la dieta sono cambiate: aggiorna il menu.' : 'Preparato oggi con quello che hai.'}</span>
               <Btn sm onClick={run}>
-                {stale ? "Aggiorna" : "Un altro menu"}
+                {stale ? 'Aggiorna' : 'Un altro menu'}
               </Btn>
             </div>
           </>
@@ -318,6 +378,55 @@ export default function DayAdvice() {
         )}
       </section>
 
+      {diet && key && (
+        <section className="win advice-box">
+          <div className="advice-head">
+            <Icon id="1f9fe" size={20} />
+            <h2 className="title grow">Spesa della dieta</h2>
+          </div>
+          {!shop ? (
+            <>
+              <p className="small muted">Cosa comprare per seguire {diet.name}, tolto quello che hai già.</p>
+              <div className="row">
+                <select className="input pick grow" value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Per quanti giorni">
+                  <option value={3}>Per 3 giorni</option>
+                  <option value={7}>Per 7 giorni</option>
+                  <option value={14}>Per 14 giorni</option>
+                </select>
+                <Btn sm color="yellow" onClick={runShop} disabled={shopBusy}>
+                  {shopBusy ? 'Preparo...' : 'Prepara la lista'}
+                </Btn>
+              </div>
+            </>
+          ) : (
+            <>
+              {shop.nota && <p className="small">{shop.nota}</p>}
+              <ul className="diet-shop">
+                {shop.spesa.map((x, i) => (
+                  <li key={i}>
+                    <label className="opt-check">
+                      <input type="checkbox" checked={!!pick[i]} onChange={(e) => setPick({ ...pick, [i]: e.target.checked })} />
+                      <span className="grow">
+                        {x.nome} <span className="muted">{x.quantita ? qtyLabel({ qty: x.quantita, unit: x.unita }) : ''}</span>
+                        {x.perche && <span className="why">{x.perche}</span>}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <div className="row">
+                <Btn sm color="yellow" onClick={addShopList} disabled={!Object.values(pick).some(Boolean)}>
+                  Aggiungi alla spesa ({Object.values(pick).filter(Boolean).length})
+                </Btn>
+                <Btn sm onClick={() => setShop(null)}>
+                  Annulla
+                </Btn>
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
       <section className="win advice-box">
         <div className="advice-head">
           <Icon id="1f6d2" size={20} />
@@ -325,22 +434,13 @@ export default function DayAdvice() {
         </div>
         {missing.length ? (
           <>
-            <p className="small muted">
-              Le cose di base che non vedo in dispensa. Tocca per metterle nella
-              spesa.
-            </p>
+            <p className="small muted">Le cose di base che non vedo in dispensa. Tocca per metterle nella spesa.</p>
             <div className="chips">
               {missing.map((e) => {
                 const f = BY_KEY[e.add || e.keys?.[0]];
                 const listed = inList(e.name, f?.key);
                 return (
-                  <button
-                    key={e.name}
-                    type="button"
-                    className={"chip " + (listed ? "listed" : "")}
-                    disabled={listed}
-                    onClick={() => addShop(e.name, f?.key)}
-                  >
+                  <button key={e.name} type="button" className={'chip ' + (listed ? 'listed' : '')} disabled={listed} onClick={() => addShop(e.name, f?.key)}>
                     {f && <Icon id={f.icon} size={16} />}
                     {e.name}
                     {listed && <span className="n">in lista</span>}
@@ -368,8 +468,8 @@ function Meter({ label, value, target }) {
       <span className="have-bar" aria-hidden="true">
         <span
           style={{
-            width: Math.round(r * 100) + "%",
-            background: r >= 0.9 ? "var(--green)" : "var(--yellow)",
+            width: Math.round(r * 100) + '%',
+            background: r >= 0.9 ? 'var(--green)' : 'var(--yellow)',
           }}
         />
       </span>
