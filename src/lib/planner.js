@@ -320,8 +320,11 @@ export function blockedReason(item) {
   if (item.food === 'olio' && !/extravergine|evo|oliva/.test(name)) return `olio diverso dall'extravergine d'oliva: ${PN} e ${MN} consigliano l'extravergine`;
   return null;
 }
+// salse, condimenti e prodotti che contengono un cibo ma non lo sono (es. "salsa di pesce" non è pesce)
+const NOT_FOOD = /\b(salsa|salse|sugo|sughi|dado|dadi|brodo|estratto|aroma|aromi|condimento|pate|crema|creme|ragu|pesto|maionese|ketchup|senape|glassa|marinata|insaporitore|polvere|whey|integratore|barrett|snack|chips|biscott|essenza)\b|pasta d['i ]\s*(acciughe|olive|sesamo|arachidi)|latte di (cocco|mandorl|soia|avena|riso)|bevanda (di|alla|vegetale)/;
 function matchPlanner(item) {
   const name = norm(item.name);
+  if (NOT_FOOD.test(name) || BY_KEY[item.food]?.role === 'cond') return null;
   // prima le parole (più precise: "pasta integrale" prima di "pasta"), poi la chiave del catalogo
   let best = null;
   let bestLen = 0;
