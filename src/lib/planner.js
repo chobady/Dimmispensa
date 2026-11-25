@@ -506,7 +506,8 @@ function dishName(meal, lines) {
   const by = (r) => lines.filter((l) => l.role === r);
   const prot = by('prot')[0];
   const carb = by('carb').find((l) => l.id !== 'paneint' || by('carb').length === 1);
-  const vegs = by('veg').map((l) => l.name.toLowerCase());
+  // per le verdure di casa il nome vero (es. "bietole erbette" invece di "insalata"), senza marca
+  const vegs = by('veg').map((l) => (l.home ? l.home.replace(/\s*\(.*?\)\s*/g, ' ').replace(/\b(a rosette|in foglia|surgelat\w*|fresc\w*|bio)\b/gi, '').replace(/\s+/g, ' ').trim() : l.name).toLowerCase());
   const pf = prot ? BYID[prot.id] : null;
   const vegTxt = vegs.length ? ` con ${vegs.join(' e ')}` : '';
   if (meal === 'Colazione') {
