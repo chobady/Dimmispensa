@@ -295,7 +295,7 @@ export function dailyTargets(person = {}) {
     goal,
     calc: slim
       ? `Per dimagrire: altezza² × ${(sex === 'f' ? 520 : 570) + (trains ? 50 : 0)} (${PN}) = ${slim} kcal. Controllo ${MN}: mantenimento ${perKg} kcal/kg sul peso desiderabile ${Math.round(wDes)} kg = ${Math.round(base)} kcal${sport ? ` + allenamento ${sport} kcal` : ''}.`
-      : `${perKg} kcal/kg (${MN}, attività ${act}, ${band === 'normo' ? 'normopeso' : band === 'sovra' ? 'peso desiderabile ' + Math.round(wDes) + ' kg' : 'sottopeso'}) = ${Math.round(base)} kcal${sport ? ` + allenamento ${sport} kcal (${met} MET × ${w} kg × ${hours.toFixed(1)} h)` : ''} = ${Math.round(tdee)} kcal${maint !== tdee ? `, portate a ${Math.round(maint)} per restare nell'intervallo di ${PN}` : ''}${goalPct ? `, ${goalPct > 0 ? '+' : '−'}${Math.abs(goalPct * 100)}% per ${goal === 'massa' ? 'la massa' : 'perdere grasso'} (${PN})` : ''} → ${kcal} kcal. Controlli: ${PN} ${Math.round(pnLow)}-${Math.round(pnHigh)} kcal; formula LARN ${Math.round(larn + sport)} kcal (il ${MN} avverte che sovrastima).`,
+      : `${perKg} kcal/kg (${MN}, attività ${act}, ${band === 'normo' ? 'normopeso' : band === 'sovra' ? 'peso desiderabile ' + Math.round(wDes) + ' kg' : 'sottopeso'}) = ${Math.round(base)} kcal${sport ? ` + allenamento ${sport} kcal (${met} MET × ${w} kg × ${hours.toFixed(1)} h) = ${Math.round(tdee)} kcal` : ''}${maint !== tdee ? `, portate a ${Math.round(maint / 10) * 10} per restare nell'intervallo di ${PN}` : ''}${goalPct ? `, ${goalPct > 0 ? '+' : '−'}${Math.abs(goalPct * 100)}% per ${goal === 'massa' ? 'la massa' : 'perdere grasso'} (${PN})` : ''}${goalPct || Math.round(maint / 10) * 10 !== kcal ? ` → ${kcal} kcal` : ''}. Controlli: ${PN} ${Math.round(pnLow)}-${Math.round(pnHigh)} kcal; formula LARN ${Math.round(larn + sport)} kcal (il ${MN} avverte che sovrastima).`,
     macroWhy: [`Proteine ${protein} g: ${pWhy}.`, `Grassi ${fat} g: 0,8 g/kg (${PN}) entro il 25-30% delle calorie (${MN}).`, `Carboidrati ${carbs} g (${ck.toFixed(1)} g/kg): il resto delle calorie, almeno 2 g/kg (${MN}).`],
     notes,
   };
@@ -480,13 +480,19 @@ function sizeMain(t, prot, carb, vegs, have, used, opts) {
       pG = prot.piece ? Math.max(prot.min, Math.round(pG / prot.piece) * prot.piece) : round(pG, prot.step || 10);
     }
     const pK = prot ? (pG / 100) * pv.kcal : 0;
+    // olio per arrivare ai grassi del pasto (MN: 1 porzione = 10 g; PN: senza abusarne), poi i carboidrati chiudono le calorie
+    if (t.f) {
+      const fOther = vegT.f + (prot ? (pG / 100) * pv.f : 0) + (cG / 100) * cv.f;
+      oilG = Math.min(opts.oilMax, Math.max(5, Math.round(t.f - fOther)));
+    }
     cG = ((t.kcal - vegT.kcal - pK - oilG * 9) / cv.kcal) * 100;
     cG = Math.min(carb.max, Math.max(carb.min, round(cG, carb.step)));
   }
-  // olio tra 5 e 20 g per chiudere le calorie (MN: 1 porzione = 10 g; PN: senza abusarne)
-  const pK = prot ? (pG / 100) * pv.kcal : 0;
-  const restK = t.kcal - vegT.kcal - pK - (cG / 100) * cv.kcal;
-  oilG = Math.min(opts.oilMax, Math.max(5, round(restK / 9, 5)));
+  if (!t.f) {
+    const pK = prot ? (pG / 100) * pv.kcal : 0;
+    const restK = t.kcal - vegT.kcal - pK - (cG / 100) * cv.kcal;
+    oilG = Math.min(opts.oilMax, Math.max(5, round(restK / 9, 5)));
+  }
   const lines = [];
   if (prot) lines.push(line(prot, pG, have, used));
   lines.push(line(carb, cG, have, used));
