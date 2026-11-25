@@ -1,11 +1,11 @@
-// Accanto alla dispensa: cosa mangiare oggi (Gemini, molte proteine e verdure, pochi zuccheri e grassi)
-// e cosa manca in casa (controllo fisso delle cose essenziali, senza Gemini).
+// Sezione Menu: cosa mangiare oggi e cosa comprare, calcolati in locale con le regole
+// del Manuale di nutrizione applicata e di Project Nutrition (lib/planner.js), e cosa manca in casa.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BY_KEY, isCasa, matchFood } from '../catalog.js';
 import { actions } from '../lib/store.js';
 import { daysLeft, todayISO } from '../lib/dates.js';
 import { newId, qtyLabel } from '../lib/items.js';
-import { dayPlan, dietShopping } from '../lib/gemini.js';
+import { lineText, logPlan, planDay, weeklyShopping } from '../lib/planner.js';
 import { play } from '../lib/sound.js';
 import { Btn, Icon, useApp } from './ui.jsx';
 
@@ -171,40 +171,61 @@ export default function DayAdvice({ compact = false, page = false }) {
     run({ ...person, oggi: d }, meals.length === MEALS.length ? null : meals);
   };
   // only: pasti da rifare (es. ['Cena']); gli altri restano quelli del menu già fatto
-  const run = async (personNow, only = null) => {
-    if (!key || busy) return;
+  // menu calcolato in locale con le regole dei due libri (planner.js): niente Gemini, conti esatti
+  const [seeds, setSeeds] = useState({});
+  const run = async (personNow, only = null, seedNow = seeds) => {
+    if (busy) return;
     if (!dayInfo && !personNow) return ask(only || MEALS);
-    setBusy(true);
     setErr('');
     try {
-      const group = (n) => (n === 'Merenda' ? 'Spuntino' : n);
-      const keep = only && plan ? plan.pasti.filter((m) => !only.includes(group(m.pasto))) : [];
-      const others = keep.map((m) => `${m.pasto}: ${m.piatto} (circa ${Math.round(m.kcal || 0)} kcal, ${Math.round(m.proteine_g || 0)} g di proteine, ${Math.round(m.verdure_g || 0)} g di verdure)`);
-      // anche quello che è già nei Pasti di oggi
-      Object.entries(state.meals?.[today] || {}).forEach(([slot, list]) => {
-        const nm = { colazione: 'Colazione', snack: 'Spuntino', pranzo: 'Pranzo', cena: 'Cena' }[slot];
-        if (only && !only.includes(nm) && list?.length && !keep.some((m) => group(m.pasto) === nm)) others.push(`${nm} (già nei Pasti): ${list.map((e) => e.name).join(', ')}`);
-      });
-      const p = await dayPlan(key, pantryText(items), personNow?.oggi ? { ...dietArg, person: personNow } : dietArg, { only, others });
-      let merged = p;
-      if (only && keep.length) {
-        const ORDER = ['Colazione', 'Spuntino', 'Pranzo', 'Merenda', 'Cena'];
-        const pasti = [...keep, ...p.pasti].sort((a, b) => ORDER.indexOf(a.pasto) - ORDER.indexOf(b.pasto));
-        const sum = (k) => pasti.reduce((t, m) => t + (Number(m[k]) || 0), 0);
-        merged = { ...p, pasti, proteine_tot: sum('proteine_g'), verdure_tot: sum('verdure_g'), kcal_tot: sum('kcal') || p.kcal_tot, da_comprare: [...new Set([...(plan.da_comprare || []), ...(p.da_comprare || [])])] };
-      }
-      const next = { date: today, sig: sigFor(personNow?.oggi || dayInfo), plan: merged };
+      const who = personNow?.oggi ? personNow : { ...person, oggi: dayInfo };
+      const p = planDay({ items, person: who, only, seed: seedNow, keep: only && plan?.local ? plan.raw : null, date: today });
+      const T = p.targets;
+      const sumK = (k) => p.pasti.reduce((t, m) => t + (m[k] || 0), 0);
+      const shaped = {
+        local: true,
+        raw: p,
+        pasti: p.pasti.map((m) => ({
+          pasto: m.pasto,
+          piatto: m.piatto,
+          ingredienti: m.lines.map(lineText),
+          proteine_g: m.p,
+          verdure_g: m.lines.filter((l) => l.role === 'veg').reduce((g, l) => g + l.g, 0),
+          kcal: m.kcal,
+          carboidrati_g: m.c,
+          grassi_g: m.f,
+          why: m.why,
+        })),
+        proteine_tot: sumK('p'),
+        verdure_tot: p.vegG,
+        kcal_tot: sumK('kcal'),
+        carboidrati_tot: sumK('c'),
+        grassi_tot: sumK('f'),
+        obiettivo: { kcal: T.kcal, p: T.protein, c: T.carbs, f: T.fat },
+        fabbisogno: T.calc,
+        regole: [...T.macroWhy, ...new Set(p.pasti.flatMap((m) => m.why))],
+        checks: p.checks,
+        note: [...T.notes, ...p.blocked.map((b) => `Non uso "${b.name}": ${b.why}.`)],
+        da_comprare: p.buy,
+      };
+      logPlan(p, today);
+      const next = { date: today, sig: sigFor(who.oggi || dayInfo), plan: shaped };
       lsSet(LS_PLAN, next);
       setSaved(next);
     } catch (e) {
-      setErr(e.message || 'Gemini non risponde.');
-    } finally {
-      setBusy(false);
+      console.error(e);
+      setErr(e.message || 'Non riesco a preparare il menu.');
     }
   };
+  const redo = (meal) => {
+    const next = { ...seeds, [meal]: (seeds[meal] || 0) + 1 };
+    setSeeds(next);
+    run(null, [meal], next);
+  };
+
   // una volta al giorno lo preparo da solo (se c'è la chiave e la dispensa non è vuota)
   useEffect(() => {
-    if (key && !plan && !busy && !err && dayInfo && items.some((i) => !isCasa(i))) run();
+    if (!plan && !busy && !err && dayInfo && items.some((i) => !isCasa(i))) run();
   }, [key, today]);
 
   // cosa manca: per chiave del catalogo o per categoria
@@ -283,10 +304,10 @@ export default function DayAdvice({ compact = false, page = false }) {
     setShop(null);
   };
   const runShop = async () => {
-    if (!key || !hasRules || shopBusy) return;
+    if (shopBusy) return;
     setShopBusy(true);
     try {
-      const r = await dietShopping(key, pantryText(items), dietArg, days);
+      const r = { spesa: weeklyShopping({ items, person, days, date: today }), nota: 'Quantità per una persona, già tolto quello che hai in casa.' };
       setShop(r);
       setPick(Object.fromEntries(r.spesa.map((x, i) => [i, true])));
     } catch (e) {
@@ -342,7 +363,7 @@ export default function DayAdvice({ compact = false, page = false }) {
       <Box compact={compact} icon="1f37d" title="Oggi da mangiare" hint={plan ? `${plan.pasti.length} pasti` : ''}>
         <div className="advice-tools">
           <button type="button" className="link-btn small" onClick={() => setEdit(!edit)}>
-            {edit ? 'Fatto' : 'I tuoi dati e libri'}
+            {edit ? 'Fatto' : 'I tuoi dati'}
           </button>
         </div>
         {edit ? (
@@ -422,28 +443,11 @@ export default function DayAdvice({ compact = false, page = false }) {
               <span>Altro da sapere (facoltativo)</span>
               <input className="input" placeholder="es. vegetariano, niente lattosio" value={person.note || ''} onChange={(e) => setP('note', e.target.value)} />
             </label>
-            <div className="diet-ctl">
-              <b className="small">I tuoi libri</b>
-              <p className="small muted">Il menu e la spesa seguono questi libri. Puoi sceglierne più di uno alla volta. Restano su questo dispositivo.</p>
-              {guides.map((g) => (
-                <div className="row guide-row" key={g.importedAt}>
-                  <span className="small grow">
-                    {g.name} <span className="muted">· {Math.round(g.size / 1000)} KB</span>
-                  </span>
-                  <Btn sm color="red" onClick={() => dropGuide(g.importedAt)}>
-                    Togli
-                  </Btn>
-                </div>
-              ))}
-              <Btn sm icon="1f4dd" onClick={() => guideRef.current?.click()}>
-                Aggiungi file JSON (anche più di uno)
-              </Btn>
-              <input ref={guideRef} type="file" accept=".json,.txt,application/json,text/plain" hidden multiple onChange={(e) => (importGuides(e.target.files), (e.target.value = ''))} />
-            </div>
+            <p className="small muted span2">Le regole dei due libri (Manuale di nutrizione applicata e Project Nutrition) sono già dentro il programma: non serve caricare file.</p>
           </div>
         ) : (
           <p className="small muted">
-            {guides.length ? `Segue tutti i tuoi libri insieme: ${guides.map((g) => g.name).join(', ')}.` : 'Nessun libro caricato: uso le linee guida italiane.'}
+            Calcolato dal programma con le regole del Manuale di nutrizione applicata e di Project Nutrition, senza Gemini.
             {hasPerson ? ` Calcolato su: ${[person.sesso ? (person.sesso === 'f' ? 'donna' : 'uomo') : '', person.eta ? person.eta + ' anni' : '', person.peso ? person.peso + ' kg' : '', person.altezza ? person.altezza + ' cm' : ''].filter(Boolean).join(', ')}.` : ''}
           </p>
         )}
@@ -453,14 +457,7 @@ export default function DayAdvice({ compact = false, page = false }) {
           </Btn>
         )}
 
-        {!key ? (
-          <p className="small">
-            Per il menu del giorno serve Gemini.{' '}
-            <a href="#opzioni" onClick={(e) => (e.preventDefault(), go('opzioni'))}>
-              Aggiungi la chiave
-            </a>
-          </p>
-        ) : asking && draft ? (
+        {asking && draft ? (
           <div className="day-ask stack">
             <div className="field">
               <span>Cosa ti preparo?</span>
@@ -555,7 +552,7 @@ export default function DayAdvice({ compact = false, page = false }) {
             </div>
           </div>
         ) : busy ? (
-          <p className="small blink">Gemini sta pensando al menu di oggi...</p>
+          <p className="small blink">Preparo il menu...</p>
         ) : err ? (
           <div className="stack">
             <p className="small late-txt">{err}</p>
@@ -579,14 +576,19 @@ export default function DayAdvice({ compact = false, page = false }) {
                   <span className="mp-when">{m.pasto}</span>
                   <span className="mp-dish">{m.piatto}</span>
                   <span className="mp-ingr">{m.ingredienti.join(' · ')}</span>
+                  {plan.local && (
+                    <span className="mp-ingr mp-macro">
+                      {Math.round(m.kcal)} kcal · P {Math.round(m.proteine_g)} g · C {Math.round(m.carboidrati_g)} g · G {Math.round(m.grassi_g)} g
+                    </span>
+                  )}
                   <span className="mp-acts">
                     <button type="button" className={'chip' + (inMeals(m) ? ' on' : '')} disabled={inMeals(m)} onClick={() => toMeals([m])}>
                       {inMeals(m) ? 'In Pasti' : '+ Pasti'}
                     </button>
-                    <button type="button" className="chip" onClick={() => run(null, [m.pasto === 'Merenda' ? 'Spuntino' : m.pasto])}>
+                    <button type="button" className="chip" onClick={() => (plan.local ? redo(m.pasto) : run(null, [m.pasto]))}>
                       Rifai {m.pasto.toLowerCase()}
                     </button>
-                    {m.kcal ? <span className="small muted">{Math.round(m.kcal)} kcal</span> : null}
+                    {m.kcal && !plan.local ? <span className="small muted">{Math.round(m.kcal)} kcal</span> : null}
                   </span>
                 </li>
               ))}
@@ -596,11 +598,35 @@ export default function DayAdvice({ compact = false, page = false }) {
                 Metti tutto il menu in Pasti (oggi)
               </Btn>
             )}
-            <div className="plan-tot">
-              <Meter label="Proteine" value={plan.proteine_tot} />
-              <Meter label="Verdure" value={plan.verdure_tot} />
-              {plan.kcal_tot ? <Meter label="Calorie" value={plan.kcal_tot} unit="kcal" /> : null}
-            </div>
+            {plan.local ? (
+              <div className="plan-tot">
+                <Meter label="Calorie" value={plan.kcal_tot} unit="kcal" target={plan.raw.only ? null : plan.obiettivo.kcal} />
+                <Meter label="Proteine" value={plan.proteine_tot} target={plan.raw.only ? null : plan.obiettivo.p} />
+                <Meter label="Carboidrati" value={plan.carboidrati_tot} target={plan.raw.only ? null : plan.obiettivo.c} />
+                <Meter label="Grassi" value={plan.grassi_tot} target={plan.raw.only ? null : plan.obiettivo.f} />
+                <Meter label="Verdure" value={plan.verdure_tot} target={plan.raw.only ? null : 400} />
+              </div>
+            ) : (
+              <div className="plan-tot">
+                <Meter label="Proteine" value={plan.proteine_tot} />
+                <Meter label="Verdure" value={plan.verdure_tot} />
+                {plan.kcal_tot ? <Meter label="Calorie" value={plan.kcal_tot} unit="kcal" /> : null}
+              </div>
+            )}
+            {plan.checks?.length > 0 && (
+              <ul className="plan-checks small">
+                {plan.checks.map((c, i) => (
+                  <li key={i} className={c.ok ? 'ok' : 'ko'}>
+                    {c.ok ? '✓' : '!'} {c.txt}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {plan.note?.map((n, i) => (
+              <p key={i} className="small">
+                {n}
+              </p>
+            ))}
             {plan.fabbisogno && <p className="small muted">{plan.fabbisogno}</p>}
             {plan.consiglio && <p className="small">{plan.consiglio}</p>}
             {plan.regole?.length > 0 && (
@@ -636,11 +662,11 @@ export default function DayAdvice({ compact = false, page = false }) {
         )}
       </Box>
 
-      {hasRules && key && (
+      {(
         <Box compact={compact} icon="1f9fe" title="Spesa secondo i libri">
           {!shop ? (
             <>
-              <p className="small muted">Cosa comprare per seguire {guides.map((g) => g.name).join(' e ')}, tolto quello che hai già.</p>
+              <p className="small muted">Cosa comprare per mangiare come dicono il Manuale e Project Nutrition: verdura e frutta di stagione, pesce, legumi, cereali integrali... tolto quello che hai già.</p>
               <div className="row">
                 <select className="input pick grow" value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Per quanti giorni">
                   <option value={3}>Per 3 giorni</option>
@@ -708,11 +734,25 @@ export default function DayAdvice({ compact = false, page = false }) {
 }
 
 // stima della giornata (gli obiettivi ora vengono dai libri)
-function Meter({ label, value, unit = 'g' }) {
+function Meter({ label, value, unit = 'g', target = null }) {
+  const v = Math.round(Number(value) || 0);
+  if (!target)
+    return (
+      <div className="meter">
+        <span className="small">
+          {label} <b>{v} {unit}</b>
+        </span>
+      </div>
+    );
+  const r = Math.min(1, v / target);
+  const ok = Math.abs(v - target) / target <= 0.1;
   return (
     <div className="meter">
       <span className="small">
-        {label} <b>{Math.round(Number(value) || 0)} {unit}</b> <span className="muted">{unit === 'kcal' ? 'stimate' : 'stimati'}</span>
+        {label} <b>{v}</b> <span className="muted">/ {Math.round(target)} {unit}</span>
+      </span>
+      <span className="have-bar" aria-hidden="true">
+        <span style={{ width: Math.round(r * 100) + '%', background: ok ? 'var(--green)' : 'var(--yellow)' }} />
       </span>
     </div>
   );

@@ -779,3 +779,8 @@ body.no-scroll { overflow: hidden; }
   .day-advice.page { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(300px, 1fr); gap: 18px; align-items: start; }
   .day-advice.page > :first-child { grid-row: span 3; }
 }
+.meals-plan .mp-macro { font-size: 13px; }
+.plan-checks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; }
+.plan-checks li.ok { color: var(--green-d, #2f7a3a); }
+.plan-checks li.ko { color: var(--red-d); font-weight: bold; }
+@media (max-width: 600px) { .plan-checks { grid-template-columns: 1fr; } }
