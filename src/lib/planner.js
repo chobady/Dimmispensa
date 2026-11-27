@@ -85,7 +85,7 @@ const VEG = {
   zucchina: ['Zucchine', 1.2], melanzana: ['Melanzane', 2.6], peperone: ['Peperoni', 1.9], pomodoro: ['Pomodori', 1.2], finocchio: ['Finocchi', 2.2], fagiolini: ['Fagiolini', 2.9],
   carciofo: ['Carciofi', 5.5], asparagi: ['Asparagi', 2.1], zucca: ['Zucca', 1], funghi: ['Funghi', 2.3], cetriolo: ['Cetrioli', 0.8], radicchio: ['Radicchio', 3], porro: ['Porri', 2.9],
   sedano: ['Sedano', 1.6], cipolla: ['Cipolle', 1], barbabietola: ['Barbabietole', 2.6], verduresurgelate: ['Verdure miste', 2.5], friarielli: ['Friarielli', 3], pakchoi: ['Pak choi', 1.5],
-  germogli: ['Germogli', 1.8], kimchi: ['Kimchi', 2],
+  germogli: ['Germogli', 1.8], kimchi: ['Kimchi', 2], topinambur: ['Topinambur', 2.1],
 };
 const FRUIT = {
   mela: ['Mela', 2], melaverde: ['Mela', 2], pera: ['Pera', 3.1], banana: ['Banana', 1.8], arancia: ['Arancia', 1.6], mandarino: ['Mandarini', 1.7], kiwi: ['Kiwi', 2.2], fragola: ['Fragole', 1.6],
@@ -102,18 +102,18 @@ const BYID = Object.fromEntries(FOODS.map((f) => [f.id, f]));
 
 // stagionalità in Italia (MN e PN: frutta e verdura di stagione)
 const SEASON_VEG = [
-  ['broccoli', 'cavolfiore', 'finocchio', 'carciofo', 'carota', 'spinaci', 'radicchio', 'porro', 'zucca', 'insalata'],
-  ['broccoli', 'cavolfiore', 'finocchio', 'carciofo', 'carota', 'spinaci', 'radicchio', 'porro', 'insalata'],
-  ['carciofo', 'spinaci', 'finocchio', 'broccoli', 'carota', 'asparagi', 'insalata', 'rucola'],
+  ['broccoli', 'cavolfiore', 'finocchio', 'carciofo', 'carota', 'spinaci', 'radicchio', 'porro', 'zucca', 'topinambur', 'insalata'],
+  ['broccoli', 'cavolfiore', 'finocchio', 'carciofo', 'carota', 'spinaci', 'radicchio', 'porro', 'topinambur', 'insalata'],
+  ['carciofo', 'spinaci', 'finocchio', 'broccoli', 'carota', 'asparagi', 'topinambur', 'insalata', 'rucola'],
   ['asparagi', 'carciofo', 'spinaci', 'carota', 'zucchina', 'insalata', 'rucola'],
   ['asparagi', 'zucchina', 'fagiolini', 'carota', 'insalata', 'rucola', 'spinaci'],
   ['zucchina', 'fagiolini', 'pomodoro', 'peperone', 'melanzana', 'cetriolo', 'insalata'],
   ['zucchina', 'pomodoro', 'peperone', 'melanzana', 'fagiolini', 'cetriolo', 'insalata'],
   ['zucchina', 'pomodoro', 'peperone', 'melanzana', 'fagiolini', 'cetriolo', 'insalata'],
   ['zucchina', 'pomodoro', 'peperone', 'melanzana', 'fagiolini', 'zucca', 'insalata'],
-  ['zucca', 'broccoli', 'cavolfiore', 'finocchio', 'spinaci', 'funghi', 'carota', 'insalata'],
-  ['broccoli', 'cavolfiore', 'finocchio', 'zucca', 'spinaci', 'radicchio', 'carciofo', 'carota', 'insalata'],
-  ['broccoli', 'cavolfiore', 'finocchio', 'carciofo', 'spinaci', 'radicchio', 'carota', 'porro', 'insalata'],
+  ['zucca', 'broccoli', 'cavolfiore', 'finocchio', 'spinaci', 'funghi', 'carota', 'topinambur', 'insalata'],
+  ['broccoli', 'cavolfiore', 'finocchio', 'zucca', 'spinaci', 'radicchio', 'carciofo', 'carota', 'topinambur', 'insalata'],
+  ['broccoli', 'cavolfiore', 'finocchio', 'carciofo', 'spinaci', 'radicchio', 'carota', 'porro', 'topinambur', 'insalata'],
 ];
 const SEASON_FRUIT = [
   ['arancia', 'mandarino', 'kiwi', 'mela', 'pera'],

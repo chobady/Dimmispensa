@@ -42,6 +42,14 @@ export const CIQUAL = {
 "n": "Carotte, crue",
 "id": 20009
 },
+"topinambur": {
+"kcal": 60.7,
+"p": 1.9,
+"c": 11.5,
+"f": 0.3,
+"n": "Topinambour, cru (Ciqual 2020)",
+"id": null
+},
 "patata": {
 "kcal": 80.0,
 "p": 2.0,

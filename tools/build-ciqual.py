@@ -53,6 +53,8 @@ def main(path):
         elif c.startswith('lipides'): col['f'] = i
     data = {r[col['code']]: r for r in rows[1:] if len(r) > max(col.values())}
     out = {}
+    # non presenti nel CSV 2025: valori Ciqual 2020 riportati da Aprifel (aprifel.com/fr/fiche-nutritionnelle/topinambour)
+    out['topinambur'] = dict(kcal=60.7, p=1.9, c=11.5, f=0.3, n='Topinambour, cru (Ciqual 2020)', id=None)
     for key, code in MAP.items():
         r = data[str(code)]
         out[key] = {k: (None if num(r[col[k]]) is None else round(num(r[col[k]]), 1)) for k in ('kcal', 'p', 'c', 'f')}
