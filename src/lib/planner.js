@@ -137,6 +137,7 @@ const NO_KEYS = {
   pancetta: `pancetta: grasso animale e carne processata (${MN}, ${PN})`,
   salame: `salumi e insaccati da evitare (${PN}) o solo occasionalmente (${MN})`,
   wurstel: `wurstel: carne processata da evitare (${MN}, ${PN})`,
+  zampone: `zampone e cotechino: insaccati grassi da evitare (${PN}) o solo occasionalmente (${MN})`,
   salsiccia: `salsiccia: insaccato e carne grassa (${MN}, ${PN})`,
   hamburger: `hamburger confezionati: carne processata (${MN}, ${PN})`,
   kebab: `kebab: carne grassa e processata (${MN}, ${PN})`,
@@ -324,7 +325,7 @@ export function blockedReason(item) {
   return null;
 }
 // salse, condimenti e prodotti che contengono un cibo ma non lo sono (es. "salsa di pesce" non è pesce)
-const NOT_FOOD = /\b(salsa|salse|sugo|sughi|dado|dadi|brodo|estratto|aroma|aromi|condimento|pate|crema|creme|ragu|pesto|maionese|ketchup|senape|glassa|marinata|insaporitore|polvere|whey|integratore|barrett|snack|chips|biscott|essenza)\b|pasta d['i ]\s*(acciughe|olive|sesamo|arachidi)|latte di (cocco|mandorl|soia|avena|riso)|bevanda (di|alla|vegetale)/;
+const NOT_FOOD = /\b(salsa|salse|sugo|sughi|dado|dadi|brodo|estratto|aroma|aromi|condimento|pate|crema|creme|ragu|pesto|maionese|ketchup|senape|glassa|marinata|insaporitore|polvere|whey|integratore|barrett|snack|chips|biscott|essenza|ossa|ossi|osso|midollo|carcass\w*|odori)\b|pasta d['i ]\s*(acciughe|olive|sesamo|arachidi)|latte di (cocco|mandorl|soia|avena|riso)|bevanda (di|alla|vegetale)/;
 function matchPlanner(item) {
   const name = norm(item.name);
   if (NOT_FOOD.test(name) || BY_KEY[item.food]?.role === 'cond') return null;
